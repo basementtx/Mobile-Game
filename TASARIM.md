@@ -19,8 +19,8 @@ telefonda birkaç dakikalık oturumlarla oynanabilecek şekilde. Hikâyeyi senar
 - **Karakter:** 5 yetenek (Savaş, Diplomasi, Entrika, Yönetim, Cazibe), 3-4 özellik, sağlık, stres, altın, şan, korku, rezalet, zorbalık.
 - **Görüş:** kalıcı ilişki puanı (zamanla söner) + anlık hesaplanan etkenler (kişilik uyumu, aile, eş/sevgili, rezalet, zorbalık, akraba katilliği…).
 - **Sırlar:** kim yaptı, kime yaptı, kimler biliyor, kamuya açık mı. Bilenlerden düşman olanlar ifşa edebilir, dedikoduyla yayılır.
-- **Unvanlar:** Krallık → 3 Dükalık → 6 Baronluk. Bağımsızlıkla yeni krallıklar/dükalıklar doğar.
-- **Savaş:** soyut ordu gücü, aylık muharebe, savaş skoru ±100. Gasp veya bağımsızlık hedefli.
+- **Unvanlar:** Krallıklar ve haritadaki şehir/kaleler. Rütbe, elde tutulan yerleşim sayısından gelir (1 → Lord/Bey, 3 → Dük/Emir, krallık → Kral/Sultan). İsyanla yeni devletler doğar.
+- **Savaş:** krallıklar arası savaşlar haritada yürüyen ordularla; karşılaşmalar otomatik ya da üstten 2D savaş ekranında çözülür; şehirler kuşatılarak alınır.
 
 ## Yol haritası
 **v0.2 — Harita ve savaş (bitti)**
