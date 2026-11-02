@@ -8,6 +8,65 @@ const esc = s => String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;'
 const UI = { screen: 'setup', drawer: null, filter: 'yakin', sheet: null, modal: null, breakdown: false, speed: 1, forcePortrait: false, sett: null, selProv: null };
 let SETUP = null;
 
+/* ---------- Simgeler (emoji yerine game-icons.net SVG'leri) ---------- */
+const ICON_COLOR = {
+  'two-coins': '#f0c050', 'crown-coin': '#f0c050', 'cash': '#9fd68a', 'receive-money': '#f0c050', 'laurel-crown': '#f1d27a', 'crown': '#f1c66c', 'trophy-cup': '#f1c66c',
+  'heart-plus': '#e0574c', 'heart-drop': '#e0574c', 'drop': '#c8453a', 'broken-heart': '#e0574c', 'rose': '#e0577a', 'love-letter': '#f2a7cb', 'diamond-ring': '#bfe3f2',
+  'fire': '#f07a2a', 'death-skull': '#e8e0d0', 'tombstone': '#b8b0a0', 'worried-eyes': '#e0b07a', 'despair': '#c79ae0', 'virus': '#9fd68a', 'snake': '#8cc46a',
+  'power-lightning': '#f1c66c', 'dove': '#e8f0f4', 'flying-flag': '#e8e0d0', 'black-flag': '#a8967c', 'pirate-flag': '#a8967c', 'wheat': '#e8c35a', 'world': '#7fb7d9',
+  'manacles': '#b8b0a0', 'crossed-swords': '#d8d0c0', 'castle': '#d8c8a8', 'village': '#d8c8a8', 'fleur-de-lys': '#f1c66c', 'help': '#a9c6ee', 'cut-diamond': '#9fe0f0',
+};
+const _EMO_SRC = '(' + Object.keys(EMOJI_ICON).sort((a, b) => b.length - a.length).map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\uFE0F?';
+const _EMO_TEST = new RegExp(_EMO_SRC, 'u');
+const _EMO_RE = new RegExp(_EMO_SRC, 'gu');
+function ic(name, cls = '') {
+  const d = ICONS[name];
+  if (!d) return '';
+  const col = ICON_COLOR[name];
+  return `<i class="ic ${cls}"${col ? ` style="color:${col}"` : ''}><svg viewBox="0 0 512 512" aria-hidden="true"><path d="${d}"/></svg></i>`;
+}
+/* Metin düğümlerindeki emojileri simgeye çevir */
+function iconizeNode(root) {
+  if (!root) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: n => (n.parentNode && !n.parentNode.closest('.ic, script, style, textarea, input') && _EMO_TEST.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT) });
+  const list = [];
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) list.push(n);
+  for (const n of list) {
+    _EMO_RE.lastIndex = 0;
+    const tpl = document.createElement('template');
+    tpl.innerHTML = esc(n.nodeValue).replace(_EMO_RE, (m, e) => ic(EMOJI_ICON[e]) || m);
+    n.parentNode.replaceChild(tpl.content, n);
+  }
+}
+let _iconObs = null;
+function startIconObserver() {
+  iconizeNode(document.body);
+  _iconObs = new MutationObserver(muts => {
+    for (const m of muts) {
+      if (m.type === 'characterData') { if (m.target.parentNode) iconizeNode(m.target.parentNode); continue; }
+      for (const n of m.addedNodes) {
+        if (n.nodeType === 3) { if (n.parentNode) iconizeNode(n.parentNode); }
+        else if (n.nodeType === 1 && !n.classList.contains('ic')) iconizeNode(n);
+      }
+    }
+  });
+  _iconObs.observe(document.body, { childList: true, subtree: true, characterData: true });
+}
+/* Haritada (canvas) simge çiz */
+const _iconPaths = {};
+function drawIcon(ctx, name, x, y, size, color, outline) {
+  const d = ICONS[name];
+  if (!d) return;
+  const p = _iconPaths[name] || (_iconPaths[name] = new Path2D(d));
+  ctx.save();
+  ctx.translate(x - size / 2, y - size / 2);
+  ctx.scale(size / 512, size / 512);
+  if (outline) { ctx.lineWidth = 512 / size * 2.5; ctx.strokeStyle = outline; ctx.lineJoin = 'round'; ctx.stroke(p); }
+  ctx.fillStyle = color || ICON_COLOR[name] || '#fff';
+  ctx.fill(p);
+  ctx.restore();
+}
+
 /* ---------- Ortak parçalar ---------- */
 function hue(str) { let h = 0; for (const c of str) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
 function avatar(c, size = 40) {
@@ -481,12 +540,12 @@ function showBattleUI(o) {
 function updateBattleHUD() {
   const a = B.units.filter(u => u.side === 0 && u.state === 'ok').length, b = B.units.filter(u => u.side === 1 && u.state === 'ok').length;
   const hero = B.hero;
-  $('#btop').innerHTML = `<span class="sa">🛡️ ${a * B.scale}</span><span class="bt">${Math.floor(B.t / 60)}:${String(Math.floor(B.t % 60)).padStart(2, '0')}</span><span class="sb">${b * B.scale} ⚔️</span>
-    <div class="hhp"><small>${esc(hero.name)}</small>${bar(Math.max(0, hero.hp), hero.max, 'hp')}</div>`;
+  setHTML($('#btop'), `<span class="sa">🛡️ ${a * B.scale}</span><span class="bt">${Math.floor(B.t / 60)}:${String(Math.floor(B.t % 60)).padStart(2, '0')}</span><span class="sb">${b * B.scale} ⚔️</span>
+    <div class="hhp"><small>${esc(hero.name)}</small>${bar(Math.max(0, hero.hp), hero.max, 'hp')}</div>`);
   $('#border').querySelectorAll('[data-o]').forEach(x => x.classList.toggle('on', x.dataset.o === B.order || (x.dataset.o === 'ov' && B.overview)));
   const m = $('#bmsg');
   const show = B.msg && B.t - (B.msgT || 0) < 3.5;
-  m.textContent = show ? B.msg : '';
+  const txt = show ? B.msg : ''; if (m._t !== txt) { m._t = txt; m.textContent = txt; }
   m.classList.toggle('hidden', !show);
 }
 function showBattleEnd() {
@@ -805,7 +864,8 @@ function openMenu() {
       <button class="act" id="mFull"><span class="ai">⛶</span><span class="al">${L('Tam ekran', 'Fullscreen')}</span></button>
       <button class="act" id="mHelp"><span class="ai">❓</span><span class="al">${L('Nasıl oynanır?', 'How to play')}</span></button>
       <button class="act" id="mNew"><span class="ai">🔄</span><span class="al">${L('Yeni oyun', 'New game')}<em>${L('Mevcut kayıt silinir', 'The current save will be deleted')}</em></span></button>
-    </div><p class="small muted">${L('Oyun otomatik kaydedilir.', 'The game saves automatically.')}</p></div>`, 'menu');
+    </div><p class="small muted">${L('Oyun otomatik kaydedilir.', 'The game saves automatically.')}</p>
+    <p class="small muted">${L('Simgeler', 'Icons')}: <a href="https://game-icons.net" target="_blank" rel="noopener">game-icons.net</a> (Lorc, Delapouite ${L('ve diğerleri', 'and others')}, CC BY 3.0) · ${L('Harita', 'Map')}: Natural Earth</p></div>`, 'menu');
   const m = $('#modal');
   m.querySelector('[data-close]').onclick = closeModal;
   bindLang(m, () => { G.terrDirty = true; $('#hudL')._h = $('#hudR')._h = $('#ctxbar')._h = $('#endturn')._h = null; updateHUD(); openMenu(); });
@@ -860,6 +920,7 @@ function checkRotate() {
 
 /* ---------- Başlat ---------- */
 window.addEventListener('load', () => {
+  startIconObserver();
   applyStaticText();
   $('#rotate').querySelector('button').onclick = () => { UI.forcePortrait = true; checkRotate(); };
   window.addEventListener('resize', () => {

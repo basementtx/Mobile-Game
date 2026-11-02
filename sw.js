@@ -1,6 +1,6 @@
 /* Çevrimdışı oynamak için basit service worker: önce ağ, olmazsa önbellek. */
-const CACHE = 'tac-ve-hancer-v3';
-const FILES = ['./', './index.html', './css/style.css', './js/i18n.js', './js/data.js', './js/geo.js', './js/engine.js', './js/world.js', './js/provinces.js', './js/actions.js', './js/events.js', './js/map.js', './js/battle.js', './js/ui.js', './manifest.webmanifest', './icon.svg'];
+const CACHE = 'tac-ve-hancer-v4';
+const FILES = ['./', './index.html', './css/style.css', './js/i18n.js', './js/icons.js', './js/data.js', './js/geo.js', './js/engine.js', './js/world.js', './js/provinces.js', './js/actions.js', './js/events.js', './js/map.js', './js/battle.js', './js/ui.js', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

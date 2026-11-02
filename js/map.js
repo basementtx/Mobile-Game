@@ -191,8 +191,8 @@ function drawMap(time) {
     ctx.fillStyle = col;
     if (s.kind === 'kale') { ctx.fillRect(sx - size * 0.55, sy - size * 0.55, size * 1.1, size * 1.1); }
     else { ctx.beginPath(); ctx.moveTo(sx, sy - size * 0.7); ctx.lineTo(sx + size * 0.7, sy); ctx.lineTo(sx, sy + size * 0.7); ctx.lineTo(sx - size * 0.7, sy); ctx.closePath(); ctx.fill(); }
-    if (s.capital) { ctx.font = `${Math.round(size * 1.5)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#ffd76a'; ctx.fillText('★', sx, sy - size - 1); }
-    if (s.siege) { ctx.font = `${Math.round(size * 1.8)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🔥', sx + size * 1.7, sy - size); }
+    if (s.capital) drawIcon(ctx, 'crown', sx, sy - size * 1.9, size * 1.7, '#ffd76a', '#1a1208');
+    if (s.siege) drawIcon(ctx, 'fire', sx + size * 1.8, sy - size, size * 1.9, '#ff8a2a', '#1a1208');
     if (showNames || s.capital) names.push([s, sx, sy + size + 3]);
   }
   // Ordular (köşeli sancak)
@@ -225,14 +225,14 @@ function drawMap(time) {
     ctx.fillStyle = col; ctx.strokeStyle = isP ? '#fff' : 'rgba(0,0,0,0.7)'; ctx.lineWidth = isP ? 2 : 1;
     ctx.beginPath(); ctx.moveTo(sx - rad * 0.6, sy - rad * 1.7); ctx.lineTo(sx + rad * 1.1, sy - rad * 1.7); ctx.lineTo(sx + rad * 0.7, sy - rad * 1.15); ctx.lineTo(sx + rad * 1.1, sy - rad * 0.6); ctx.lineTo(sx - rad * 0.6, sy - rad * 0.6); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.fillRect(sx - rad * 0.55, sy - rad * 0.5, rad * 1.1, rad * 1.1); ctx.strokeRect(sx - rad * 0.55, sy - rad * 0.5, rad * 1.1, rad * 1.1);
-    if (pt.kind === 'bandit') { ctx.fillStyle = '#e8e0d0'; ctx.font = `${Math.round(rad)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('☠', sx, sy + 0.05 * rad); }
+    if (pt.kind === 'bandit') drawIcon(ctx, 'death-skull', sx, sy + 0.05 * rad, rad * 1.05, '#e8e0d0');
     if (isP || z >= 34 || (hostile && z >= 18)) {
       ctx.font = `700 ${isP ? 12 : 10}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
       ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.fillStyle = isP ? '#ffe08a' : hostile ? '#ffb4a8' : '#f2ead8';
       const label = isP ? `${L('Sen', 'You')} · ${n}` : `${n}`;
       ctx.strokeText(label, sx, sy + rad * 0.85 + 2); ctx.fillText(label, sx, sy + rad * 0.85 + 2);
     }
-    if (pt.mode === 'siege' && pt.sid && G.titles[pt.sid] && G.titles[pt.sid].siege) { ctx.font = '11px sans-serif'; ctx.textAlign = 'left'; ctx.fillText('⚔', sx + rad + 4, sy - rad); }
+    if (pt.mode === 'siege' && pt.sid && G.titles[pt.sid] && G.titles[pt.sid].siege) drawIcon(ctx, 'crossed-swords', sx + rad + 8, sy - rad, 12, '#ffd2c0', '#1a1208');
   }
   // Tur durakları
   if (route) {
