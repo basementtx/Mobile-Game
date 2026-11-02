@@ -1,0 +1,15 @@
+{
+  "name": "Taç ve Hançer",
+  "short_name": "Taç ve Hançer",
+  "description": "Ortaçağda entrika, ihanet, aşk ve iktidar. Köylüden krala.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#16110d",
+  "theme_color": "#16110d",
+  "lang": "tr",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
