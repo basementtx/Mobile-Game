@@ -1,0 +1,12 @@
+{
+  "appId": "io.github.basementtx.crowndagger",
+  "appName": "Crown & Dagger",
+  "webDir": "www",
+  "server": {
+    "url": "https://basementtx.github.io/Mobile-Game/",
+    "cleartext": false
+  },
+  "android": {
+    "backgroundColor": "#16110d"
+  }
+}

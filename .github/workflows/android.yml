@@ -1,0 +1,74 @@
+# Android APK: GitHub Pages'teki oyunu tam ekran açan uygulama kabuğu (Capacitor).
+# Oyunun kendisi her açılışta siteden yüklenir; bu yüzden oyun güncellemeleri için APK'yı yeniden kurmak gerekmez.
+# APK her zaman aynı adreste: Releases -> "android-latest".
+name: Android APK
+
+on:
+  push:
+    branches: [ccr-e6f4b707-ziqx27]
+    paths: ['android-app/**', '.github/workflows/android.yml', 'icon.svg']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Install Capacitor
+        run: npm install --no-audit --no-fund
+      - name: Create Android project
+        run: npx cap add android
+      - name: App icon and splash
+        run: npx capacitor-assets generate --android --iconBackgroundColor '#16110d' --splashBackgroundColor '#16110d'
+      - name: Landscape + fullscreen
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          sed -i 's/<activity/<activity android:screenOrientation="sensorLandscape"/' $M
+          for f in android/app/src/main/res/values/styles.xml; do
+            sed -i 's#</style>#    <item name="android:windowFullscreen">true</item>\n        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>\n    </style>#g' $f
+          done
+          grep -n screenOrientation $M
+      - name: Sync
+        run: npx cap sync android
+      - name: Build APK
+        working-directory: android-app/android
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          if [ -n "$KEYSTORE_B64" ]; then
+            # İsteğe bağlı: depo sırlarında kalıcı bir imza anahtarı varsa onunla imzala (güncellemeler üstüne kurulur)
+            echo "$KEYSTORE_B64" | base64 -d > $RUNNER_TEMP/app.keystore
+            ./gradlew assembleRelease \
+              -Pandroid.injected.signing.store.file=$RUNNER_TEMP/app.keystore \
+              -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+              -Pandroid.injected.signing.key.alias=crowndagger \
+              -Pandroid.injected.signing.key.password="$KEYSTORE_PASSWORD"
+            cp app/build/outputs/apk/release/app-release.apk $GITHUB_WORKSPACE/crown-and-dagger.apk
+          else
+            ./gradlew assembleDebug
+            cp app/build/outputs/apk/debug/app-debug.apk $GITHUB_WORKSPACE/crown-and-dagger.apk
+          fi
+      - name: Publish to release "android-latest"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-latest
+          name: Android APK
+          body: "Install crown-and-dagger.apk on your phone. Game updates load automatically; reinstall only when this APK changes."
+          files: crown-and-dagger.apk
+          make_latest: true
+          target_commitish: ${{ github.sha }}
