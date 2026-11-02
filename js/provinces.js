@@ -163,9 +163,60 @@ function buildProvinces() {
     const [sx, sy] = settXY[pv.seat];
     pv.dir = Math.round(((Math.atan2(-(pv.y - sy), pv.x - sx) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 4)) % 8;
   }
-  // 7) Hızlı arama için ızgara
+  // 7) Düz Voronoi kenarlarını doğal, girintili çıkıntılı sınırlara çevir
+  roughenBorders();
+  // 8) Hızlı arama için ızgara
   _provHash = new Map();
   for (const pv of PROV) { const k = hk(pv.x, pv.y); let a = _provHash.get(k); if (!a) _provHash.set(k, a = []); a.push(pv.id); }
+}
+
+/* Kenarı ara noktalarla kır (orta nokta kaydırma): gerçek sınırlara benzeyen kıvrımlı çizgi */
+function roughLine(x1, y1, x2, y2, rand) {
+  const out = [[x1, y1]];
+  const rec = (ax, ay, bx, by, amp, depth) => {
+    const len = Math.hypot(bx - ax, by - ay);
+    if (len < 0.05 || depth > 7) { out.push([bx, by]); return; }
+    const nx = -(by - ay) / len, ny = (bx - ax) / len;
+    const o = (rand() * 2 - 1) * amp * len, t = 0.38 + rand() * 0.24;
+    const mx = ax + (bx - ax) * t + nx * o, my = ay + (by - ay) * t + ny * o;
+    rec(ax, ay, mx, my, amp * 0.72, depth + 1);
+    rec(mx, my, bx, by, amp * 0.72, depth + 1);
+  };
+  rec(x1, y1, x2, y2, 0.3, 0);
+  return out;
+}
+function roughenBorders() {
+  const lines = new Map();
+  for (const e of PROV_EDGES) {
+    e.pts = roughLine(e.x1, e.y1, e.x2, e.y2, mulberry32(e.a * 7919 + e.b * 104729 + 17));
+    lines.set(e.a + ',' + e.b, e.pts);
+  }
+  for (const pv of PROV) {
+    const P = pv.poly, n = P.length, out = [];
+    for (let i = 0; i < n; i++) {
+      const j = P[i][2];
+      const line = j >= 0 ? (pv.id < j ? lines.get(pv.id + ',' + j) : lines.get(j + ',' + pv.id)) : null;
+      if (!line) { out.push(P[i]); continue; }
+      const seq = pv.id < j ? line : line.slice().reverse();
+      for (let k = 0; k < seq.length - 1; k++) out.push(seq[k]);
+    }
+    pv.rough = out;
+  }
+}
+function pointInPoly(x, y, poly) {
+  let ins = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) ins = !ins;
+  }
+  return ins;
+}
+/* Dokunulan noktanın ili: kıvrımlı sınırlara göre (bulunamazsa en yakın tohum) */
+function provinceAtExact(x, y) {
+  const near = provinceAt(x, y);
+  if (!near || pointInPoly(x, y, near.rough)) return near;
+  for (const e of near.nb) { const q = PROV[e.to]; if (pointInPoly(x, y, q.rough)) return q; }
+  return near;
 }
 
 /* (x,y) noktasının ili = en yakın tohum (Voronoi tanımı) */

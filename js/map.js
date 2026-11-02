@@ -53,7 +53,7 @@ function setupMap(cv) {
     LANDPATH.closePath();
   }
   PROVPATH = new Path2D();
-  for (const e of PROV_EDGES) { PROVPATH.moveTo(e.x1, e.y1); PROVPATH.lineTo(e.x2, e.y2); }
+  for (const e of PROV_EDGES) linePath(PROVPATH, e.pts);
   // Deniz dokusu: ince, keskin yatay çizgiler
   const t = document.createElement('canvas'); t.width = t.height = 48;
   const c = t.getContext('2d');
@@ -69,6 +69,10 @@ function resizeMap() {
   const d = Math.min(2, window.devicePixelRatio || 1);
   MAPCV.width = MAPCV.clientWidth * d; MAPCV.height = MAPCV.clientHeight * d;
   MAPCV._d = d;
+}
+function linePath(path, pts) {
+  path.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) path.lineTo(pts[i][0], pts[i][1]);
 }
 function polyPath(path, poly) {
   path.moveTo(poly[0][0], poly[0][1]);
@@ -94,10 +98,10 @@ function buildTerritory() {
       g = { col: r ? r.color : '#9a9080', path: new Path2D(), mine: false };
       groups.set(k, g);
     }
-    polyPath(g.path, pv.poly);
+    polyPath(g.path, pv.rough);
   });
   const border = new Path2D();
-  for (const e of PROV_EDGES) if (keys[e.a] !== keys[e.b]) { border.moveTo(e.x1, e.y1); border.lineTo(e.x2, e.y2); }
+  for (const e of PROV_EDGES) if (keys[e.a] !== keys[e.b]) linePath(border, e.pts);
   TERR = { fills: [...groups.values()], border, keys };
   G.terrDirty = false;
 }
@@ -135,13 +139,13 @@ function drawMap(time) {
   for (const g of TERR.fills) { ctx.fillStyle = g.col; ctx.fill(g.path); }
   ctx.globalAlpha = 1;
   // İl sınırları (ince) ve krallık sınırları (kalın)
-  ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   ctx.lineWidth = Math.max(0.6, Math.min(1.1, z / 30)) * px; ctx.strokeStyle = 'rgba(28,20,12,0.38)'; ctx.stroke(PROVPATH);
   ctx.lineWidth = 2.4 * px; ctx.strokeStyle = 'rgba(18,12,6,0.92)'; ctx.stroke(TERR.border);
   ctx.lineWidth = 0.8 * px; ctx.strokeStyle = 'rgba(255,240,205,0.35)'; ctx.stroke(TERR.border);
   // Seçili il
   if (UI.selProv != null && PROV[UI.selProv]) {
-    const sp = new Path2D(); polyPath(sp, PROV[UI.selProv].poly);
+    const sp = new Path2D(); polyPath(sp, PROV[UI.selProv].rough);
     ctx.fillStyle = 'rgba(255,225,140,0.18)'; ctx.fill(sp);
     ctx.lineWidth = 2.2 * px; ctx.strokeStyle = '#ffd76a'; ctx.stroke(sp);
   }
@@ -327,7 +331,7 @@ function mapTap(cx, cy) {
   if (best) { UI.selProv = partyProv(best.obj).id; showPopup(best, cx, cy); }
   else {
     const [mx, my] = screenToMap(sx, sy);
-    const pv = provinceAt(mx, my);
+    const pv = provinceAtExact(mx, my);
     if (!pv || !isLand(mx, my) && Math.hypot(pv.x - mx, pv.y - my) > 2.5) { UI.selProv = null; hidePopup(); return; }
     UI.selProv = pv.id;
     showPopup({ kind: 'prov', obj: pv }, cx, cy);
