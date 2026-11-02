@@ -12,10 +12,10 @@ let B = null;
 function battleUnit(side, type, x, y, extra) {
   const T = TROOPS[type];
   const u = Object.assign({
-    side, type, cls: T.sinif, ranged: T.range > 0, range: T.range,
+    side, type, cls: T.sinif, ranged: T.range > 0, range: T.range, tier: T.tier,
     x, y, hx: x, hy: y, vx: 0, vy: 0, face: side === 0 ? 0 : Math.PI,
     hp: T.hp, max: T.hp, atk: T.atk, def: T.def, spd: T.spd * 52,
-    r: T.sinif === 'atli' ? 8.5 : 6, cd: Math.random(), tgt: null, retarget: Math.random() * 0.4,
+    r: T.sinif === 'atli' ? 9.5 : 7, cd: Math.random(), tgt: null, retarget: Math.random() * 0.4,
     state: 'ok', flash: 0, lastAtk: -9, hero: false, leader: false,
   }, extra || {});
   return u;
@@ -39,8 +39,8 @@ function startBattle(o) {
     const lay = (list, x0, yc, cols) => {
       list.forEach((k, i) => {
         const row = Math.floor(i / cols), col = i % cols;
-        const y = yc + (col - (Math.min(cols, list.length) - 1) / 2) * 15 + (Math.random() - 0.5) * 3;
-        units.push(battleUnit(side, k, x0 - dir * row * 15, clamp(y, 30, BH - 30), { slot: [x0 - dir * row * 15 - baseX, y - BH / 2] }));
+        const y = yc + (col - (Math.min(cols, list.length) - 1) / 2) * 17 + (Math.random() - 0.5) * 3;
+        units.push(battleUnit(side, k, x0 - dir * row * 17, clamp(y, 30, BH - 30), { slot: [x0 - dir * row * 17 - baseX, y - BH / 2] }));
       });
     };
     lay(groups.piyade, baseX, BH / 2, 22);
@@ -127,8 +127,8 @@ function hurt(u, dmg, src) {
   if (src) { const a = Math.atan2(u.y - src.y, u.x - src.x); u.vx += Math.cos(a) * 40; u.vy += Math.sin(a) * 40; }
   if (u.hp <= 0) {
     u.state = 'dead'; stampBlood(u.x, u.y, u.cls === 'atli');
-    if (u.hero) { B.heroDown = true; B.msg = 'Ağır yaralandın ve yere düştün!'; }
-    if (u.leader) { B.leaderDown = true; B.msg = 'Düşman komutanı düştü!'; }
+    if (u.hero) { B.heroDown = true; B.msg = L('Ağır yaralandın ve yere düştün!', 'You are badly wounded and fall to the ground!'); B.msgT = B.t; }
+    if (u.leader) { B.leaderDown = true; B.msg = L('Düşman komutanı düştü!', 'The enemy commander has fallen!'); B.msgT = B.t; }
   }
 }
 function nearestEnemy(u, maxD) {
@@ -167,7 +167,7 @@ function battleStep(dt) {
     if (broken && !B['rout' + s]) {
       B['rout' + s] = true;
       for (const u of B.units) if (u.side === s && u.state === 'ok' && !u.hero) u.state = 'rout';
-      B.msg = s === 1 ? 'Düşman bozguna uğradı ve kaçıyor!' : 'Askerlerin dağılıyor!';
+      B.msg = s === 1 ? L('Düşman bozguna uğradı ve kaçıyor!', 'The enemy is routed and fleeing!') : L('Askerlerin dağılıyor!', 'Your troops are breaking!'); B.msgT = B.t;
     }
   }
   const order = B.order;
@@ -288,15 +288,15 @@ function endBattle(won, retreated) {
     if (u.hero || u.leader) continue;
     const dead = u.state === 'dead' || (retreated && u.side === 0 && u.state === 'ok' && Math.random() < 0.25);
     if (!dead) continue;
-    const L = u.side === 0 ? lossA : lossB;
-    L[u.type] = (L[u.type] || 0) + B.scale;
+    const Ls = u.side === 0 ? lossA : lossB;
+    Ls[u.type] = (Ls[u.type] || 0) + B.scale;
   }
-  const cap = (L, troops) => { for (const k in L) L[k] = Math.min(L[k], troops[k] || 0); };
+  const cap = (Ls, troops) => { for (const k in Ls) Ls[k] = Math.min(Ls[k], troops[k] || 0); };
   cap(lossA, B.o.A.troops); cap(lossB, B.o.enemy.troops);
   // Kaybeden taraf kaçarken ek kayıp verir
   if (!retreated) {
-    const loserT = won ? B.o.enemy.troops : B.o.A.troops, L = won ? lossB : lossA;
-    for (const k in loserT) L[k] = Math.min(loserT[k], (L[k] || 0) + Math.round(((loserT[k] || 0) - (L[k] || 0)) * 0.35));
+    const loserT = won ? B.o.enemy.troops : B.o.A.troops, Ls = won ? lossB : lossA;
+    for (const k in loserT) Ls[k] = Math.min(loserT[k], (Ls[k] || 0) + Math.round(((loserT[k] || 0) - (Ls[k] || 0)) * 0.35));
   }
   B.result = { won, retreated: !!retreated, lossA, lossB, heroDown: !!B.heroDown, leaderDown: !!B.leaderDown };
   setTimeout(() => showBattleEnd(), 700);
@@ -311,7 +311,7 @@ function drawBattle() {
   let cx, cy, sc;
   if (B.overview) { sc = Math.min(W / BW, H / BH); cx = BW / 2; cy = BH / 2; }
   else {
-    sc = H / 520;
+    sc = H / 420;
     const h = B.hero;
     if (h.state === 'ok') { cx = h.x; cy = h.y; }
     else { const al = B.units.filter(u => u.side === 0 && u.state === 'ok'); const src = al.length ? al : B.units.filter(u => u.state === 'ok'); cx = src.reduce((a, u) => a + u.x, 0) / (src.length || 1) || BW / 2; cy = src.reduce((a, u) => a + u.y, 0) / (src.length || 1) || BH / 2; }
@@ -348,11 +348,19 @@ function drawBattle() {
     if (!u.ranged && u.cls !== 'okcu') { ctx.strokeStyle = '#d8d0c0'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(0, u.r * 0.5); ctx.lineTo(u.r * 2.1, u.r * 0.5); ctx.stroke(); }
     else { ctx.strokeStyle = '#a07040'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(u.r * 0.6, 0, u.r * 0.8, -1.1, 1.1); ctx.stroke(); }
     ctx.rotate(-u.face);
-    const rr = u.cls === 'atli' ? u.r * 0.62 : u.r;
+    const rr = u.cls === 'atli' ? u.r * 0.74 : u.r;
     ctx.fillStyle = u.flash > 0 ? '#fff' : col; ctx.strokeStyle = dark; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(0, 0, rr, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    if (u.type === 'piyade' || u.type === 'agir') { ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.arc(0, 0, rr * 0.45, 0, Math.PI * 2); ctx.fill(); }
+    // Seviye: Roma rakamı (ekranda okunabilecek kadar büyükse)
+    if (!u.hero && !u.leader && u.tier && rr * sc >= 4.5) {
+      const txt = ROMAN[u.tier];
+      ctx.font = `700 ${(rr * (txt.length > 2 ? 0.95 : 1.15)).toFixed(1)}px Georgia, 'Times New Roman', serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = u.flash > 0 ? '#000' : '#fff6e0';
+      ctx.fillText(txt, 0, rr * 0.06);
+    }
     if (u.hero || u.leader) {
+      ctx.font = `700 ${(rr * 1.1).toFixed(1)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff6e0'; ctx.fillText('★', 0, rr * 0.05);
       ctx.strokeStyle = u.hero ? '#ffd24a' : '#e8e8e8'; ctx.lineWidth = 2.5;
       ctx.beginPath(); ctx.arc(0, 0, rr + 4, 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(-14, -rr - 12, 28, 4);

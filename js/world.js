@@ -4,14 +4,15 @@
    kuşatmalar, eşkıyalar, zaman akışı
    ========================================================= */
 
-const DAY_SEC = 0.45;        // 1x hızda bir günün gerçek saniyesi
+const DAY_SEC = 0.26;        // tur çözülürken 1x hızda bir günün gerçek saniyesi
+const TURN_DAYS = 5;         // bir tur kaç gün sürer
 const SIEGE_DAYS = 5;        // hücuma kadar kuşatma süresi
 const CONTACT = 0.32;        // iki ordunun karşılaşma mesafesi (harita birimi)
 const ENTER_DIST = 0.4;      // şehre girme mesafesi
 
 /* ---------- Kara ızgarası (deniz/kara testi ve bölge boyama) ---------- */
 const GRID = { step: 0.2, w: 0, h: 0 };
-let LANDP = null, LANDGRID = null, NEARGRID = null;
+let LANDP = null, LANDGRID = null;
 function inRing(x, y, r) {
   let ins = false;
   for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
@@ -39,29 +40,12 @@ function buildGeo() {
       }
     }
   }
+  buildProvinces();
 }
 function isLand(x, y) {
   const i = Math.floor(x / GRID.step), j = Math.floor(y / GRID.step);
   if (i < 0 || j < 0 || i >= GRID.w || j >= GRID.h) return false;
   return LANDGRID[j * GRID.w + i] === 1;
-}
-/* Her kara hücresine en yakın yerleşim (bölge sınırları için) */
-function buildNearGrid() {
-  const S = G.settIds.map(id => G.titles[id]);
-  NEARGRID = new Int16Array(GRID.w * GRID.h).fill(-1);
-  for (let j = 0; j < GRID.h; j++) {
-    const y = (j + 0.5) * GRID.step;
-    for (let i = 0; i < GRID.w; i++) {
-      if (!LANDGRID[j * GRID.w + i]) continue;
-      const x = (i + 0.5) * GRID.step;
-      let best = -1, bd = 3.2 * 3.2;
-      for (let k = 0; k < S.length; k++) {
-        const dx = S[k].x - x, dy = S[k].y - y, d = dx * dx + dy * dy;
-        if (d < bd) { bd = d; best = k; }
-      }
-      NEARGRID[j * GRID.w + i] = best;
-    }
-  }
 }
 const settlements = () => G.settIds.map(id => G.titles[id]);
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -97,9 +81,9 @@ function declareWar(r1, r2, reason) {
   if (!r1 || !r2 || r1 === r2 || atWarRealms(r1, r2)) return;
   G.wars.push({ a: r1.id, b: r2.id, start: G.day, taken: { [r1.id]: 0, [r2.id]: 0 } });
   const p = P(), pr = realmOf(p);
-  const msg = `⚔️ ${r1.name}, ${r2.name}'na savaş ilan etti!${reason ? ' ' + reason : ''}`;
+  const msg = L(`⚔️ ${r1.name}, ${r2.name} ile savaşa girdi!${reason ? ' ' + reason : ''}`, `⚔️ ${r1.name} declared war on ${r2.name}!${reason ? ' ' + reason : ''}`);
   log(msg, 'war');
-  if (pr && (pr === r1 || pr === r2)) info('⚔️ Savaş!', `${msg}<br><br>${pr === r2 ? 'Topraklarımız saldırı altında.' : 'Sancaklar açıldı.'} Düşman orduları haritada kırmızı halkayla görünür.`);
+  if (pr && (pr === r1 || pr === r2)) info(L('⚔️ Savaş!', '⚔️ War!'), `${msg}<br><br>${pr === r2 ? L('Topraklarımız saldırı altında.', 'Our lands are under attack.') : L('Sancaklar açıldı.', 'The banners are raised.')} ${L('Düşman orduları haritada kırmızı çerçeveyle görünür.', 'Enemy armies are marked with a red frame on the map.')}`);
   G.terrDirty = true;
 }
 function makePeace(r1, r2) {
@@ -107,28 +91,49 @@ function makePeace(r1, r2) {
   if (!w) return;
   G.wars = G.wars.filter(x => x !== w);
   for (const s of settlements()) if (s.siege) { const sp = G.parties.find(x => x.id === s.siege.by); if (!sp || !hostileParties(sp, { kind: 'x', owner: s.holder })) s.siege = null; }
-  log(`🕊️ ${r1.name} ile ${r2.name} barış yaptı.`, 'war');
+  log(L(`🕊️ ${r1.name} ile ${r2.name} barış yaptı.`, `🕊️ ${r1.name} and ${r2.name} made peace.`), 'war');
 }
 function createRealm(c, name) {
   const east = CULTURES[c.cul] && CULTURES[c.cul].east;
   const h = rnd(0, 359);
-  const r = addTitle(name || `${c.dyn} ${east ? 'Beyliği' : 'Krallığı'}`, 5, null, {
-    kind: 'realm', key: null, color: `hsl(${h} 45% 50%)`, cul: c.cul,
-    u: east ? ['Bey', 'Hatun'] : ['Kral', 'Kraliçe'],
-  });
+  const r = addTitle(name || '', 5, null, { kind: 'realm', key: null, color: `hsl(${h} 45% 50%)`, cul: c.cul, east: !!east, dynName: c.dyn });
+  if (!name) r.name = realmName(r);
   for (const s of settlementsOf(c)) s.liege = r.id;
   giveTitle(r, c);
   refreshLieges();
   G.terrDirty = true;
   return r;
 }
+/* Kurulan krallıkların adı ve hükümdar unvanı dile göre */
+function realmName(r) {
+  if (r.key && REALMS[r.key]) return REALMS[r.key].ad;
+  if (r.dynName) return r.east ? L(`${r.dynName} Beyliği`, `Beylik of ${r.dynName}`) : L(`${r.dynName} Krallığı`, `Kingdom of ${r.dynName}`);
+  return r.name;
+}
+function realmShort(r) {
+  if (r.key && REALMS[r.key]) return REALMS[r.key].kisa;
+  return r.dynName || r.name;
+}
+function rulerTitles(r) {
+  if (r.key && REALMS[r.key]) return REALMS[r.key].u;
+  return r.east ? ['Bey', 'Hatun'] : L(['Kral', 'Kraliçe'], ['King', 'Queen']);
+}
+/* Dil değişince/yüklenince kayıtlı adları yenile */
+function relocalize() {
+  if (!G) return;
+  for (const t of Object.values(G.titles)) {
+    if (isRealm(t)) { if (t.key || t.dynName) t.name = realmName(t); }
+    else if (isSettlement(t)) { if (!t.trName) t.trName = t.name; t.name = settName(t.trName); }
+  }
+}
+
 /* Bir vasal isyan eder: kendi krallığını kurar ve eski efendisine savaş açar */
 function rebel(c) {
   const old = realmOf(c);
   if (!settlementsOf(c).length) return null;
   const r = createRealm(c);
   c.prestige += 50;
-  if (old && old !== r) declareWar(r, old, `${nm(c)} isyan etti!`);
+  if (old && old !== r) declareWar(r, old, L(`${nm(c)} isyan etti!`, `${nm(c)} rebelled!`));
   return r;
 }
 function checkRealmDeath(r) {
@@ -140,7 +145,7 @@ function checkRealmDeath(r) {
   r.holder = null;
   G.wars = G.wars.filter(w => w.a !== r.id && w.b !== r.id);
   refreshLieges();
-  log(`💀 ${r.name} tarihe karıştı!`, 'war');
+  log(L(`💀 ${r.name} tarihe karıştı!`, `💀 ${r.name} has fallen into history!`), 'war');
 }
 
 /* ---------- Ordular ---------- */
@@ -188,7 +193,7 @@ function spawnLordParty(c) {
   const home = settlementsOf(c)[0] || (ch(c.lordId) && settlementsOf(ch(c.lordId))[0]);
   if (!home) return null;
   const n = Math.max(12, Math.round(partyCap(c) * (0.5 + Math.random() * 0.4)));
-  return makeParty({ owner: c.id, kind: 'lord', x: home.x + rnd(-10, 10) / 50, y: home.y + rnd(-10, 10) / 50, troops: troopMix(c.cul, n, c.rank >= 5) });
+  return makeParty({ owner: c.id, kind: 'lord', x: home.x, y: home.y, troops: troopMix(c.cul, n, c.rank >= 5) });
 }
 function homeOf(c) {
   const own = settlementsOf(c);
@@ -222,51 +227,51 @@ function applyLosses(pt, frac) {
   }
   return lost;
 }
-function lossText(l) { const a = Object.entries(l).filter(([, n]) => n > 0); return a.length ? a.map(([k, n]) => `${n} ${TROOPS[k].ad}`).join(', ') : 'kayıp yok'; }
+function lossText(l) { const a = Object.entries(l).filter(([, n]) => n > 0); return a.length ? a.map(([k, n]) => `${n} ${TROOPS[k].ad}`).join(', ') : L('kayıp yok', 'none'); }
 
 /* Savaş sonucu (otomatik ya da savaş ekranından). W: kazanan ordu, L: kaybeden */
-function battleAftermath(W, L, opts = {}) {
-  const wc = ch(W.owner), lc = ch(L.owner), p = P();
-  const lp = opts.loserPower || partyPower(L);
+function battleAftermath(W, Lp, opts = {}) {
+  const wc = ch(W.owner), lc = ch(Lp.owner), p = P();
+  const lp = opts.loserPower || partyPower(Lp);
   const out = [];
   if (wc) wc.prestige += clamp(Math.round(lp / 25), 3, 80);
   if (lc) lc.prestige -= 10;
-  if (L.kind === 'bandit') {
-    const loot = L.gold || 0;
+  if (Lp.kind === 'bandit') {
+    const loot = Lp.gold || 0;
     if (wc) wc.gold += loot;
-    if (loot) out.push(`Eşkıyaların ganimeti: ${loot} altın.`);
-    removeParty(L);
+    if (loot) out.push(L(`Eşkıyaların ganimeti: ${loot} altın.`, `The bandits' loot: ${loot} gold.`));
+    removeParty(Lp);
     return out;
   }
-  if (wc && W.kind === 'player') { const loot = Math.round(lp * 0.06) + rnd(5, 25); wc.gold += loot; out.push(`Ganimet: ${loot} altın.`); }
+  if (wc && W.kind === 'player') { const loot = Math.round(lp * 0.06) + rnd(5, 25); wc.gold += loot; out.push(L(`Ganimet: ${loot} altın.`, `Loot: ${loot} gold.`)); }
   if (lc && lc.alive) {
     if (chance(opts.heroDown ? 0.75 : 0.35) && wc && wc.alive) {
       const lname = nm(lc);
       imprison(wc, lc, true);
-      out.push(`<b>${lname}</b> esir düştü!`);
-      if (lc.id === p.id) info('⛓️ Esir düştün', `Ordun dağıldı ve sen <b>${nm(wc)}</b> tarafından esir alındın.<br><br>Kaçmayı deneyebilir, gardiyana rüşvet verebilir ya da fidye bekleyebilirsin.`);
+      out.push(L(`<b>${lname}</b> esir düştü!`, `<b>${lname}</b> was taken prisoner!`));
+      if (lc.id === p.id) info(L('⛓️ Esir düştün', '⛓️ Captured'), L(`Ordun dağıldı ve sen <b>${nm(wc)}</b> tarafından esir alındın.<br><br>Kaçmayı deneyebilir, gardiyana rüşvet verebilir ya da fidye bekleyebilirsin.`, `Your army scattered and you were taken prisoner by <b>${nm(wc)}</b>.<br><br>You can try to escape, bribe a guard or wait for a ransom.`));
     } else if (chance(0.04) && lc.id !== p.id) {
-      out.push(`<b>${nm(lc)}</b> savaş meydanında öldü!`);
-      die(lc, `${wc ? nm(wc) : 'Düşman'} ile savaşta öldü`);
+      out.push(L(`<b>${nm(lc)}</b> savaş meydanında öldü!`, `<b>${nm(lc)}</b> fell on the battlefield!`));
+      die(lc, L(`${wc ? nm(wc) : 'Düşman'} ile savaşta öldü`, `Killed in battle against ${wc ? nm(wc) : 'the enemy'}`));
     }
   }
-  if (G.parties.includes(L) && (troopCount(L) < 5 || !ch(L.owner) || !free(ch(L.owner)))) {
-    if (L.kind === 'player') { L.troops = {}; }
-    else removeParty(L);
-  } else if (G.parties.includes(L)) { L.mode = 'home'; L.chase = null; L.stun = 1; }
+  if (G.parties.includes(Lp) && (troopCount(Lp) < 5 || !ch(Lp.owner) || !free(ch(Lp.owner)))) {
+    if (Lp.kind === 'player') { Lp.troops = {}; }
+    else removeParty(Lp);
+  } else if (G.parties.includes(Lp)) { Lp.mode = 'home'; Lp.chase = null; Lp.stun = 1; }
   return out;
 }
 function autoBattle(A, B) {
   const pa = partyPower(A) * rnd(80, 120) / 100, pb = partyPower(B) * rnd(80, 120) / 100;
-  const W = pa >= pb ? A : B, L = W === A ? B : A;
+  const W = pa >= pb ? A : B, Lz = W === A ? B : A;
   const ratio = Math.min(pa, pb) / Math.max(pa, pb, 1);
-  const lp = partyPower(L);
+  const lp = partyPower(Lz);
   const lw = applyLosses(W, clamp(ratio * 0.45, 0.02, 0.55));
-  const ll = applyLosses(L, clamp(0.55 + (1 - ratio) * 0.4, 0.5, 0.95));
-  const notes = battleAftermath(W, L, { loserPower: lp });
-  const wc = ch(W.owner), lc = ch(L.owner);
-  const wn = W.kind === 'bandit' ? 'Eşkıyalar' : nm(wc), ln = L.kind === 'bandit' ? 'eşkıyaları' : nm(lc);
-  return { W, L, lw, ll, text: `${wn}, ${ln} yendi.`, notes };
+  const ll = applyLosses(Lz, clamp(0.55 + (1 - ratio) * 0.4, 0.5, 0.95));
+  const notes = battleAftermath(W, Lz, { loserPower: lp });
+  const wc = ch(W.owner), lc = ch(Lz.owner);
+  const wn = W.kind === 'bandit' ? L('Eşkıyalar', 'Bandits') : nm(wc), ln = Lz.kind === 'bandit' ? L('eşkıyaları', 'bandits') : nm(lc);
+  return { W, L: Lz, lw, ll, text: L(`${wn}, ${ln} yendi.`, `${wn} defeated ${ln}.`), notes };
 }
 
 /* ---------- Kuşatma ---------- */
@@ -284,9 +289,9 @@ function captureSettlement(s, c) {
     if (w) w.taken[r.id] = (w.taken[r.id] || 0) + 1;
   }
   if (oldH && oldH.alive) addOp(oldH, c, -40);
-  log(`🏴 ${s.name}, ${nm(c)} tarafından ele geçirildi!`, 'war');
-  if (c.id === G.playerId) info('🏴 Zafer!', `<b>${s.name}</b> artık senin! Sancağın surlarda dalgalanıyor.${!realmOf(c) ? '<br><br>Hiçbir krala bağlı değilsin. Yeterince toprak ve şan toplarsan kendi krallığını ilan edebilirsin.' : ''}`);
-  else if (oldH && oldH.id === G.playerId) info('🏴 Kaybettin', `<b>${s.name}</b> düştü! ${nm(c)} şehrini ele geçirdi.`);
+  log(L(`🏴 ${s.name}, ${nm(c)} tarafından ele geçirildi!`, `🏴 ${s.name} was captured by ${nm(c)}!`), 'war');
+  if (c.id === G.playerId) info(L('🏴 Zafer!', '🏴 Victory!'), L(`<b>${s.name}</b> artık senin! Sancağın surlarda dalgalanıyor.`, `<b>${s.name}</b> is yours! Your banner flies from the walls.`) + (!realmOf(c) ? L('<br><br>Hiçbir krala bağlı değilsin. Yeterince toprak ve şan toplarsan kendi krallığını ilan edebilirsin.', '<br><br>You serve no king. Gather enough land and prestige and you can proclaim your own kingdom.') : ''));
+  else if (oldH && oldH.id === G.playerId) info(L('🏴 Kaybettin', '🏴 Lost'), L(`<b>${s.name}</b> düştü! ${nm(c)} şehrini ele geçirdi.`, `<b>${s.name}</b> has fallen! ${nm(c)} took your holding.`));
   if (oldR) checkRealmDeath(oldR);
   G.terrDirty = true;
 }
@@ -307,14 +312,14 @@ function siegeAssault(pt, s) {
 
 /* ---------- Yapay zekâ ---------- */
 function setGoal(pt, x, y, mode) { pt.tx = x; pt.ty = y; pt.chase = null; pt.mode = mode; }
+/* Ordular hep il merkezlerinde konaklar: r yarıçapındaki rastgele bir il merkezi */
 function randomLandNear(x, y, r) {
-  for (let i = 0; i < 20; i++) {
-    const a = Math.random() * Math.PI * 2, d = Math.random() * r;
-    const nx = x + Math.cos(a) * d, ny = y + Math.sin(a) * d;
-    if (isLand(nx, ny)) return [nx, ny];
-  }
-  return [x, y];
+  const list = PROV.filter(p => Math.abs(p.x - x) < r && Math.abs(p.y - y) < r && Math.hypot(p.x - x, p.y - y) < r);
+  if (!list.length) { const p = provinceAt(x, y); return p ? [p.x, p.y] : [x, y]; }
+  const p = pick(list);
+  return [p.x, p.y];
 }
+function snapToProv(x, y) { const p = provinceAt(x, y); return p ? [p.x, p.y] : [x, y]; }
 function aiParty(pt) {
   if (pt.kind === 'player') return;
   if (pt.stun > 0) { pt.stun--; return; }
@@ -324,7 +329,8 @@ function aiParty(pt) {
   const threat = near.find(o => hostileParties(pt, o) && dist(pt, o) < 2.2 && partyPower(o) > pow * 1.25);
   if (threat) {
     const dx = pt.x - threat.x, dy = pt.y - threat.y, d = Math.hypot(dx, dy) || 1;
-    setGoal(pt, pt.x + dx / d * 2.5, pt.y + dy / d * 2.5, 'flee');
+    const [fx, fy] = snapToProv(clamp(pt.x + dx / d * 2.5, 0, MAP.W), clamp(pt.y + dy / d * 2.5, 0, MAP.H));
+    setGoal(pt, fx, fy, 'flee');
     return;
   }
   if (pt.kind === 'bandit') {
@@ -405,23 +411,87 @@ function moveParty(pt, dtDays) {
   else { pt.x += dx / d * step; pt.y += dy / d * step; }
   pt.x = clamp(pt.x, 0, MAP.W); pt.y = clamp(pt.y, 0, MAP.H);
 }
-/* Oyuncunun ordusunu joystick ile sür (vx,vy: -1..1) */
-function steerPlayer(vx, vy, dtDays) {
-  const pt = playerParty();
-  if (!pt) return;
-  pt.tx = pt.ty = null; pt.chase = null;
-  const m = Math.min(1, Math.hypot(vx, vy));
-  if (m < 0.05) return;
-  const step = partySpeed(pt) * dtDays * m;
-  pt.x = clamp(pt.x + vx / Math.hypot(vx, vy) * step, 0, MAP.W);
-  pt.y = clamp(pt.y + vy / Math.hypot(vx, vy) * step, 0, MAP.H);
+/* ---------- Tur tabanlı oyuncu hareketi ---------- */
+/* Bir turda kaç il ilerlenebilir (deniz geçişi 2 puan) */
+function movePoints(pt) { return Math.max(1, Math.round(partySpeed(pt) * 3.6)); }
+function partyProv(pt) { return pt ? provinceAt(pt.x, pt.y) : null; }
+/* Oyuncuya bir hedef il ver. Dönüş: yol ya da null (ulaşılamaz) */
+function orderMove(toProv) {
+  const pp = playerParty();
+  if (!pp) return null;
+  const from = partyProv(pp);
+  const path = findPath(from.id, toProv);
+  if (!path) return null;
+  pp.path = path; pp.chase = null; pp.tx = pp.ty = null;
+  return path;
 }
+function orderChase(target) {
+  const pp = playerParty();
+  if (!pp) return;
+  pp.chase = target.id; pp.tx = pp.ty = null;
+  const tp = partyProv(target);
+  pp.path = tp ? findPath(partyProv(pp).id, tp.id) || [] : [];
+}
+function cancelOrders() { const pp = playerParty(); if (pp) { pp.path = []; pp.chase = null; pp.leg = null; pp.tx = pp.ty = null; } }
+/* Turun başında: bu turda yürünecek parçayı hazırla */
+function beginTurn() {
+  const pp = playerParty();
+  G.turnLeft = TURN_DAYS;
+  G.dayFrac = 0;
+  G.turnEndDay = G.day + TURN_DAYS;
+  if (!pp) return;
+  pp.tx = pp.ty = null; pp.leg = null;
+  if (pp.chase != null) {
+    const t = G.parties.find(x => x.id === pp.chase);
+    if (!t) { pp.chase = null; pp.path = []; }
+    else { const tp = partyProv(t); pp.path = findPath(partyProv(pp).id, tp.id) || []; }
+  }
+  if (!pp.path || !pp.path.length) return;
+  const from = partyProv(pp);
+  const step = splitTurns(from.id, pp.path, movePoints(pp))[0] || [];
+  pp.path = pp.path.slice(step.length);
+  const pts = [[pp.x, pp.y], ...step.map(id => [PROV[id].x, PROV[id].y])];
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  pp.leg = { pts, cum, len: cum[cum.length - 1] };
+  if (pp.mode === 'siege') { const s = G.titles[pp.sid]; if (s && s.siege && s.siege.by === pp.id) s.siege = null; pp.mode = 'idle'; }
+}
+/* Tur ilerlerken oyuncuyu yolunda yürüt */
+function stepPlayerLeg() {
+  const pp = playerParty();
+  if (!pp || !pp.leg) return;
+  const f = clamp(1 - G.turnLeft / TURN_DAYS, 0, 1), d = f * pp.leg.len, { pts, cum } = pp.leg;
+  let i = 1;
+  while (i < pts.length - 1 && cum[i] < d) i++;
+  const seg = cum[i] - cum[i - 1] || 1, t = clamp((d - cum[i - 1]) / seg, 0, 1);
+  pp.x = pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * t;
+  pp.y = pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * t;
+}
+/* dd gün ilerlet (tur içinde). Dönüş: oyuncuyla temas eden düşman (varsa) */
+function stepTurn(dd) {
+  dd = Math.min(dd, G.turnLeft);
+  G.turnLeft -= dd;
+  stepPlayerLeg();
+  const foe = advanceTime(dd);
+  if (G.turnLeft <= 1e-6) {
+    G.turnLeft = 0;
+    while (G.turnEndDay != null && G.day < G.turnEndDay && !G.over) dayTick();
+    G.dayFrac = 0;
+    const pp = playerParty();
+    if (pp && pp.leg) { const e = pp.leg.pts[pp.leg.pts.length - 1]; pp.x = e[0]; pp.y = e[1]; pp.leg = null; }
+    G.turn = (G.turn || 1) + 1;
+  }
+  return foe;
+}
+function turnTurnsLeft(pp) {
+  if (!pp || !pp.path || !pp.path.length) return 0;
+  return splitTurns(partyProv(pp).id, pp.path, movePoints(pp)).length;
+}
+
 /* Gerçek zamanlı ilerleme. Dönüş: oyuncuyla temas eden düşman ordu (varsa) */
 function advanceTime(dtDays) {
   G.dayFrac = (G.dayFrac || 0) + dtDays;
   for (const pt of G.parties) if (pt.kind !== 'player') moveParty(pt, dtDays);
-  const pp = playerParty();
-  if (pp && (pp.tx != null || pp.chase != null)) moveParty(pp, dtDays);
   while (G.dayFrac >= 1) {
     G.dayFrac -= 1;
     dayTick();
@@ -469,7 +539,7 @@ function dayTick() {
     const s = G.titles[pt.sid];
     if (s && !s.siege && dist(pt, s) < 0.3 && hostileChars(ch(pt.owner), ch(s.holder))) {
       s.siege = { by: pt.id, days: 0 };
-      if (s.holder === G.playerId) info('🔥 Kuşatma!', `<b>${nm(ch(pt.owner))}</b> ${s.name} kuşatıyor! Garnizon: ${s.garrison}. ${SIEGE_DAYS} gün içinde hücum edecekler.`);
+      if (s.holder === G.playerId) info(L('🔥 Kuşatma!', '🔥 Siege!'), L(`<b>${nm(ch(pt.owner))}</b> ${s.name} kuşatıyor! Garnizon: ${s.garrison}. ${SIEGE_DAYS} gün içinde hücum edecekler.`, `<b>${nm(ch(pt.owner))}</b> is besieging ${s.name}! Garrison: ${s.garrison}. They will storm the walls within ${SIEGE_DAYS} days.`));
     }
   }
   if (G.day % 10 === 0) respawnParties();
@@ -487,17 +557,18 @@ function respawnParties() {
   if (free(p) && isAdult(p) && !playerParty()) {
     const pr = realmOf(p);
     const s = nearestSettlement(G.lastX ?? MAP.W / 2, G.lastY ?? MAP.H / 2, x => !pr || x.liege === pr.id) || settlements()[0];
-    makeParty({ owner: p.id, kind: 'player', x: s.x, y: s.y + 0.15, troops: {} });
-    log(`🚶 ${s.name} yakınlarında yeniden yola çıktın.`, 'info');
+    makeParty({ owner: p.id, kind: 'player', x: s.x, y: s.y, troops: {}, path: [] });
+    log(L(`🚶 ${s.name} yakınlarında yeniden yola çıktın.`, `🚶 You set out again near ${s.name}.`), 'info');
   }
 }
-const BANDIT_NAMES = ['Orman eşkıyaları', 'Dağ haydutları', 'Kaçak askerler', 'Yol kesiciler', 'Bozkır akıncıları', 'Korsanlar', 'Yağmacılar'];
+const BANDIT_NAMES = [BL('Orman eşkıyaları', 'Forest bandits'), BL('Dağ haydutları', 'Mountain brigands'), BL('Kaçak askerler', 'Deserters'), BL('Yol kesiciler', 'Highwaymen'), BL('Bozkır akıncıları', 'Steppe raiders'), BL('Korsanlar', 'Corsairs'), BL('Yağmacılar', 'Marauders')];
+const banditName = pt => (typeof pt.name === 'number' ? pickB(BANDIT_NAMES[pt.name]) : pt.name || L('Eşkıyalar', 'Bandits'));
 function spawnBandits() {
   const s = pick(settlements());
   const [x, y] = randomLandNear(s.x, s.y, 2.5);
   if (!isLand(x, y)) return;
   const n = rnd(8, 35);
-  makeParty({ kind: 'bandit', name: pick(BANDIT_NAMES), x, y, hx: x, hy: y, gold: rnd(15, 70), troops: { milis: Math.round(n * 0.65), okcu: Math.round(n * 0.25), atli: Math.round(n * 0.1) } });
+  makeParty({ kind: 'bandit', name: rnd(0, BANDIT_NAMES.length - 1), x, y, hx: x, hy: y, gold: rnd(15, 70), troops: { milis: Math.round(n * 0.65), okcu: Math.round(n * 0.25), atli: Math.round(n * 0.1) } });
 }
 function monthWorld() {
   G.month++;
@@ -514,9 +585,9 @@ function monthWorld() {
     else {
       const lost = applyLosses(pt, 0.2);
       c.gold = 0;
-      if (c.id === p.id) log(`💸 Maaşları ödeyemedin! Askerlerin kaçtı: ${lossText(lost)}`, 'bad');
+      if (c.id === p.id) log(L(`💸 Maaşları ödeyemedin! Askerlerin kaçtı: ${lossText(lost)}`, `💸 You could not pay wages! Deserters: ${lossText(lost)}`), 'bad');
     }
-    if (c.id === p.id && wage) log(`💰 Aylık gelir: +${income(c)} · Asker maaşları: -${Math.min(wage, c.gold + wage)}`, 'info');
+    if (c.id === p.id && wage) log(L(`💰 Aylık gelir: +${income(c)} · Asker maaşları: -${Math.min(wage, c.gold + wage)}`, `💰 Monthly income: +${income(c)} · Wages: -${Math.min(wage, c.gold + wage)}`), 'info');
   }
   // Garnizon ve asker havuzu
   for (const s of settlements()) {
@@ -606,16 +677,16 @@ function onCharGone(c, heir) {
 /* ---------- Yeni dünya ---------- */
 function newWorld(opt) {
   G = {
-    year: 1180, month: 2, day: 0, dayFrac: 0, chars: {}, titles: {}, secrets: [], wars: [], log: [], queue: [], parties: [], feud: [], settIds: [],
+    year: 1180, month: 2, day: 0, dayFrac: 0, turn: 1, turnLeft: 0, chars: {}, titles: {}, secrets: [], wars: [], log: [], queue: [], parties: [], feud: [], settIds: [],
     nextId: 1, nextTitle: 1, nextSecret: 1, nextWar: 1, nextParty: 1, playerId: null, ap: AP_MAX,
     over: null, monthsPlayed: 0, generation: 1, founder: `${opt.name} ${opt.dyn}`, personalFoes: [],
   };
   buildGeo();
   const rt = {};
-  for (const [key, R] of Object.entries(REALMS)) rt[key] = addTitle(R.ad, 5, null, { kind: 'realm', key, color: R.renk, cul: R.kul, u: R.u });
+  for (const [key, R] of Object.entries(REALMS)) rt[key] = addTitle(R.ad, 5, null, { kind: 'realm', key, color: R.renk, cul: R.kul });
   for (const [name, lon, lat, type, rk, cap] of SETTLEMENTS) {
     const [x, y] = proj(lon, lat);
-    const s = addTitle(name, 3, rt[rk].id, { kind: type, x, y, capital: !!cap, garrison: type === 'sehir' ? 40 : 32, prosperity: 1, cul: REALMS[rk].kul, siege: null, pool: {} });
+    const s = addTitle(settName(name), 3, rt[rk].id, { trName: name, kind: type, x, y, capital: !!cap, garrison: type === 'sehir' ? 40 : 32, prosperity: 1, cul: REALMS[rk].kul, siege: null, pool: {} });
     s.pool = poolFor(s);
     G.settIds.push(s.id);
   }
@@ -663,7 +734,7 @@ function newWorld(opt) {
   refreshLieges();
   for (const c of living()) if (c.rank >= 3 && c.id !== p.id) spawnLordParty(c);
   const startTroops = { koylu: {}, sovalye: R.kul === 'turk' || R.kul === 'arap' ? { milis: 6, atliokcu: 4 } : { milis: 6, piyade: 4 }, lord: troopMix(R.kul, 30) }[opt.start];
-  makeParty({ owner: p.id, kind: 'player', x: startS.x + 0.12, y: startS.y + 0.12, troops: startTroops });
+  makeParty({ owner: p.id, kind: 'player', x: startS.x, y: startS.y, troops: startTroops, path: [] });
   for (let i = 0; i < 16; i++) spawnBandits();
   const W = (a, b) => { const ra = rt[a], rb = rt[b]; if (ra && rb) G.wars.push({ a: ra.id, b: rb.id, start: 0, taken: { [ra.id]: 0, [rb.id]: 0 } }); };
   W('eyyubi', 'kudus'); W('muvahhid', 'kastilya'); W('muvahhid', 'portekiz'); W('selcuklu', 'bizans');
@@ -673,17 +744,28 @@ function newWorld(opt) {
       if (others.length) { const o = pick(others); if (chance(0.5) && o.female !== c.female) becomeLovers(c, o); else addOp(c, o, rnd(-60, 60)); }
     }
   }
-  buildNearGrid();
   G.terrDirty = true;
+  const sold = p.cul === 'turk' || p.cul === 'arap';
   const startText = {
-    koylu: `${startS.name} yakınlarında, çamurlu bir köyde doğdun. Adın yok, şanın yok, sadece hırsın var.`,
-    sovalye: `${nm(playerLiege)} hizmetinde yemin etmiş genç bir ${p.cul === 'turk' || p.cul === 'arap' ? 'sipahisin' : 'şövalyesin'}. Yanında bir avuç asker var.`,
-    lord: `${startS.name} artık senin. ${R.ad} içinde küçük ama hırslı bir ${rankName(p).toLowerCase()}sin.`,
+    koylu: L(`${startS.name} yakınlarında, çamurlu bir köyde doğdun. Adın yok, şanın yok, sadece hırsın var.`, `You were born in a muddy village near ${startS.name}. No name, no glory — only ambition.`),
+    sovalye: L(`${nm(playerLiege)} hizmetinde yemin etmiş genç bir ${sold ? 'sipahisin' : 'şövalyesin'}. Yanında bir avuç asker var.`, `You are a young ${sold ? 'sipahi' : 'knight'} sworn to ${nm(playerLiege)}, with a handful of soldiers at your side.`),
+    lord: L(`${startS.name} artık senin. ${R.ad} içinde küçük ama hırslı bir ${rankName(p).toLowerCase()}sin.`, `${startS.name} is yours. You are a small but ambitious ${rankName(p).toLowerCase()} of the ${R.ad}.`),
   }[opt.start];
-  log(`📜 ${MONTHS[G.month]} ${G.year}. ${startText}`, 'info');
-  info('📜 Taç ve Hançer', `${startText}<br><br><b>Sol alttaki joystick</b> ile ordunu haritada yürüt. Haritayı parmağınla kaydır, iki parmakla yakınlaştır. Bir şehre ya da orduya <b>dokunarak</b> uzaktan bilgi al ve karar ver.<br><br>Düşman ordusuna çarparsan savaş başlar. Sağdaki menülerden kişiler, ordun ve toprakların yönetilir. Her ay ${AP_MAX} entrika hakkın var.`);
+  log(`📜 ${monthName(G.month)} ${G.year}. ${startText}`, 'info');
+  info(L('📜 Taç ve Hançer', '📜 Crown & Dagger'), startText + L(
+    `<br><br>Oyun <b>tur tabanlıdır</b>; her tur ${TURN_DAYS} gün sürer. Haritada bir ile, şehre ya da orduya <b>dokun</b> ve "Buraya git" de: yol, her turda nereye varacağınla birlikte çizilir. Hazır olunca sağ alttaki <b>TURU BİTİR</b> düğmesine bas.<br><br>Haritayı parmağınla kaydır, iki parmakla yakınlaştır. Düşmanla aynı yere gelirsen savaş başlar. Sağdaki menülerden kişiler, ordun ve toprakların yönetilir. Her ay ${AP_MAX} entrika hakkın var.`,
+    `<br><br>The game is <b>turn-based</b>; each turn lasts ${TURN_DAYS} days. <b>Tap</b> a province, city or army on the map and choose "Move here": the route is drawn, showing where you will be at the end of each turn. When ready, press <b>END TURN</b> at the bottom right.<br><br>Drag to pan, pinch to zoom. Meeting an enemy army starts a battle. The menu on the right manages people, your army and your lands. You get ${AP_MAX} intrigue actions each month.`));
   saveGame();
 }
 let _lastSave = 0;
 function saveGameThrottled() { const t = Date.now(); if (t - _lastSave > 4000) { _lastSave = t; saveGame(); } }
-function afterLoad() { buildGeo(); buildNearGrid(); G.terrDirty = true; }
+function afterLoad() {
+  buildGeo();
+  relocalize();
+  G.turn = G.turn || 1; G.turnLeft = G.turnLeft || 0;
+  for (const pt of G.parties) {
+    if (pt.kind === 'player') { pt.path = pt.path || []; if (!pt.leg && G.turnLeft <= 0) { const p = provinceAt(pt.x, pt.y); if (p && Math.hypot(p.x - pt.x, p.y - pt.y) > CONTACT) { pt.x = p.x; pt.y = p.y; } } pt.tx = pt.ty = null; }
+    if (pt.kind === 'bandit' && typeof pt.name === 'string') pt.name = 0;
+  }
+  G.terrDirty = true;
+}

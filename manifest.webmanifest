@@ -1,14 +1,14 @@
 {
-  "name": "Taç ve Hançer",
-  "short_name": "Taç ve Hançer",
-  "description": "Ortaçağda entrika, ihanet, aşk ve iktidar. Köylüden krala.",
+  "name": "Crown & Dagger",
+  "short_name": "Crown & Dagger",
+  "description": "Medieval intrigue, betrayal, love and power. From peasant to king.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "landscape",
   "background_color": "#16110d",
   "theme_color": "#16110d",
-  "lang": "tr",
+  "lang": "en",
   "icons": [
     { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]

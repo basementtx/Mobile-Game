@@ -56,24 +56,25 @@ function traitStress(c, map) {
   if (s) stress(c, s);
   return s;
 }
-function stressNote(s) { return s > 0 ? ` (Stres +${s})` : s < 0 ? ` (Stres ${s})` : ''; }
+function stressNote(s) { const w = L('Stres', 'Stress'); return s > 0 ? ` (${w} +${s})` : s < 0 ? ` (${w} ${s})` : ''; }
 
 /* ---------- İsimler ---------- */
+const isEast = c => !!(CULTURES[c.cul] && CULTURES[c.cul].east);
 function rankNames(c) {
-  const east = CULTURES[c.cul] && CULTURES[c.cul].east;
-  return east ? (c.female ? RANKS_EAST_F : RANKS_EAST_M) : (c.female ? RANKS_F : RANKS_M);
+  return RANK_TABLE[(isEast(c) ? 'e' : '') + (c.female ? 'f' : 'm')].map(pickB);
 }
 function rankName(c) {
-  if (c.age < 16) return c.female ? 'Kız çocuk' : 'Erkek çocuk';
-  if (c.rank === 5) { const r = ownRealm(c); if (r) return REALMS[r.key] ? REALMS[r.key].u[c.female ? 1 : 0] : r.u[c.female ? 1 : 0]; }
+  if (c.age < 16) return c.female ? L('Kız çocuk', 'Girl') : L('Erkek çocuk', 'Boy');
+  if (c.rank === 5) { const r = ownRealm(c); if (r) return rulerTitles(r)[c.female ? 1 : 0]; }
   return rankNames(c)[c.rank];
 }
 function nm(c) {
-  if (!c) return 'Bilinmeyen biri';
+  if (!c) return L('Bilinmeyen biri', 'Someone unknown');
   if (c.age < 16 || c.rank < 2) return `${c.name} ${c.dyn}`;
   const r = rankName(c);
-  if (c.rank === 2 && !(CULTURES[c.cul] && CULTURES[c.cul].east)) return `${c.female ? 'Dame' : 'Sör'} ${c.name} ${c.dyn}`;
-  if (r === 'Bey' || r === 'Hatun' || r === 'Sipahi' || r === 'Emir') return `${c.name} ${r} (${c.dyn})`;
+  if (c.rank === 2 && !isEast(c)) return `${c.female ? 'Dame' : L('Sör', 'Sir')} ${c.name} ${c.dyn}`;
+  if (isEast(c) && c.rank >= 2 && c.rank <= 4) return `${c.name} ${r} (${c.dyn})`;
+  if (c.rank === 5 && (r === 'Bey' || r === 'Hatun')) return `${c.name} ${r} (${c.dyn})`;
   return `${r} ${c.name} ${c.dyn}`;
 }
 function titleOf(c) {
@@ -83,7 +84,7 @@ function titleOf(c) {
   if (ss.length) return ss.map(t => t.name).slice(0, 3).join(', ') + (ss.length > 3 ? '…' : '');
   return rankName(c);
 }
-function dateStr() { return `${MONTHS[G.month]} ${G.year}`; }
+function dateStr() { return `${monthName(G.month)} ${G.year}`; }
 function log(m, k = 'info') {
   G.log.unshift({ d: dateStr(), m, k });
   if (G.log.length > 300) G.log.length = 300;
@@ -210,14 +211,15 @@ function isUnder(a, b) {
 /* ---------- Aile ---------- */
 function familyRel(a, b) {
   if (!a || !b || a.id === b.id) return null;
-  if (a.spouseId === b.id) return 'Eş';
-  if (a.fatherId === b.id || a.realFatherId === b.id) return 'Baba';
-  if (a.motherId === b.id) return 'Anne';
-  if (b.fatherId === a.id || b.motherId === a.id || b.realFatherId === a.id) return 'Çocuk';
-  if ((a.fatherId && a.fatherId === b.fatherId) || (a.motherId && a.motherId === b.motherId)) return 'Kardeş';
+  if (a.spouseId === b.id) return 'es';
+  if (a.fatherId === b.id || a.realFatherId === b.id) return 'baba';
+  if (a.motherId === b.id) return 'anne';
+  if (b.fatherId === a.id || b.motherId === a.id || b.realFatherId === a.id) return 'cocuk';
+  if ((a.fatherId && a.fatherId === b.fatherId) || (a.motherId && a.motherId === b.motherId)) return 'kardes';
   return null;
 }
-function closeKin(a, b) { const r = familyRel(a, b); return r && r !== 'Eş'; }
+function relName(k) { return { es: L('Eş', 'Spouse'), baba: L('Baba', 'Father'), anne: L('Anne', 'Mother'), cocuk: L('Çocuk', 'Child'), kardes: L('Kardeş', 'Sibling') }[k] || k; }
+function closeKin(a, b) { const r = familyRel(a, b); return r && r !== 'es'; }
 function heirOf(c) {
   const kids = c.children.map(ch).filter(k => k && k.alive && !k.bastard && (k.fatherId === c.id || k.motherId === c.id));
   kids.sort((a, b) => b.age - a.age);
@@ -256,7 +258,7 @@ function opinionParts(a, b) {
   const parts = [];
   if (!a || !b || a.id === b.id) return parts;
   const base = Math.round(a.op[b.id] || 0);
-  if (base) parts.push(['Geçmiş ilişkiler', base]);
+  if (base) parts.push([L('Geçmiş ilişkiler', 'Past dealings'), base]);
   let comp = 0;
   for (const t of a.traits) {
     const T = TRAITS[t];
@@ -265,22 +267,22 @@ function opinionParts(a, b) {
     if (T.zit && has(b, T.zit)) comp -= 12;
   }
   comp = clamp(comp, -30, 30);
-  if (comp) parts.push(['Kişilik uyumu', comp]);
-  if (has(b, 'guzel')) parts.push(['Güzelliği', 10]);
-  if (has(b, 'cirkin')) parts.push(['Çirkinliği', -5]);
+  if (comp) parts.push([L('Kişilik uyumu', 'Personality'), comp]);
+  if (has(b, 'guzel')) parts.push([L('Güzelliği', 'Beauty'), 10]);
+  if (has(b, 'cirkin')) parts.push([L('Çirkinliği', 'Ugliness'), -5]);
   const rel = familyRel(a, b);
-  if (rel === 'Eş') parts.push(['Eşi', 20]);
-  else if (rel) parts.push([rel, 15]);
-  if (a.lovers.includes(b.id)) parts.push(['Sevgilisi', 30]);
-  if (a.lordId === b.id && b.prestige > 0) parts.push(['Efendisinin şanı', Math.min(20, Math.floor(b.prestige / 40))]);
+  if (rel === 'es') parts.push([L('Eşi', 'Spouse'), 20]);
+  else if (rel) parts.push([relName(rel), 15]);
+  if (a.lovers.includes(b.id)) parts.push([L('Sevgilisi', 'Lover'), 30]);
+  if (a.lordId === b.id && b.prestige > 0) parts.push([L('Efendisinin şanı', 'Liege\'s prestige'), Math.min(20, Math.floor(b.prestige / 40))]);
   if (b.shame > 1) {
     const s = -Math.round(b.shame * (has(a, 'durust') ? 0.6 : 0.3));
-    if (s) parts.push(['Rezaleti', s]);
+    if (s) parts.push([L('Rezaleti', 'Shame'), s]);
   }
-  if (b.tyranny > 1 && isUnder(a, b)) parts.push(['Zorbalığı', -Math.round(b.tyranny)]);
-  if (has(b, 'akrabakatili') && a.id !== b.id) parts.push(['Akraba katili', -20]);
-  if (has(a, 'paranoyak') && !rel) parts.push(['Paranoya', -10]);
-  if (a.prisonerOf === b.id) parts.push(['Onu zindanda tutuyor', -30]);
+  if (b.tyranny > 1 && isUnder(a, b)) parts.push([L('Zorbalığı', 'Tyranny'), -Math.round(b.tyranny)]);
+  if (has(b, 'akrabakatili') && a.id !== b.id) parts.push([L('Akraba katili', 'Kinslayer'), -20]);
+  if (has(a, 'paranoyak') && !rel) parts.push([L('Paranoya', 'Paranoia'), -10]);
+  if (a.prisonerOf === b.id) parts.push([L('Onu zindanda tutuyor', 'Keeps them imprisoned'), -30]);
   return parts;
 }
 function opinion(a, b) { return clamp(opinionParts(a, b).reduce((s, p) => s + p[1], 0), -100, 100); }
@@ -337,7 +339,7 @@ function exposeSecret(s) {
     }
   }
   const p = P();
-  if (p && (knows(p, s) || relevant(a, t))) log(`📢 Skandal! ${secretText(s)}`, 'scandal');
+  if (p && (knows(p, s) || relevant(a, t))) log(L(`📢 Skandal! ${secretText(s)}`, `📢 Scandal! ${secretText(s)}`), 'scandal');
 }
 
 /* ---------- Ölüm ---------- */
@@ -367,16 +369,16 @@ function die(c, reason) {
   }
   if (typeof onCharGone === 'function') onCharGone(c, heir);
   refreshLieges();
-  if (!wasPlayer && relevant(c)) log(`✝️ ${nm(c)} öldü — ${reason}. (${c.age} yaşında)`, 'death');
+  if (!wasPlayer && relevant(c)) log(L(`✝️ ${nm(c)} öldü — ${reason}. (${c.age} yaşında)`, `✝️ ${nm(c)} died — ${reason}. (age ${c.age})`), 'death');
   if (wasPlayer) {
     if (heir) {
       G.playerId = heir.id;
       G.generation = (G.generation || 1) + 1;
-      log(`☠️ ${c.name} ${c.dyn} öldü — ${reason}. Hanedan ${heir.name} ile devam ediyor.`, 'death');
-      info('☠️ Ölüm', `<b>${c.name} ${c.dyn}</b> ${c.age} yaşında öldü.<br><i>${reason}</i><br><br>Hanedanın yaşıyor. Artık varisin <b>${nm(heir)}</b> (${heir.age} yaşında) olarak oynuyorsun.`);
+      log(L(`☠️ ${c.name} ${c.dyn} öldü — ${reason}. Hanedan ${heir.name} ile devam ediyor.`, `☠️ ${c.name} ${c.dyn} died — ${reason}. The dynasty lives on through ${heir.name}.`), 'death');
+      info(L('☠️ Ölüm', '☠️ Death'), L(`<b>${c.name} ${c.dyn}</b> ${c.age} yaşında öldü.<br><i>${reason}</i><br><br>Hanedanın yaşıyor. Artık varisin <b>${nm(heir)}</b> (${heir.age} yaşında) olarak oynuyorsun.`, `<b>${c.name} ${c.dyn}</b> died at the age of ${c.age}.<br><i>${reason}</i><br><br>Your dynasty lives on. You now play as your heir, <b>${nm(heir)}</b> (age ${heir.age}).`));
     } else {
       G.over = { name: `${c.name} ${c.dyn}`, reason, age: c.age, d: dateStr() };
-      log(`☠️ ${c.name} ${c.dyn} öldü — ${reason}. Geride varis kalmadı. Hanedan sona erdi.`, 'death');
+      log(L(`☠️ ${c.name} ${c.dyn} öldü — ${reason}. Geride varis kalmadı. Hanedan sona erdi.`, `☠️ ${c.name} ${c.dyn} died — ${reason}. No heir remains. The dynasty has ended.`), 'death');
     }
   }
 }
@@ -402,7 +404,7 @@ function execute(captor, c) {
   for (const x of living()) if (familyRel(x, c) || x.lovers.includes(c.id)) addOp(x, captor, -80);
   captor.dread += 15;
   if (!just) captor.tyranny += 20;
-  die(c, `${nm(captor)} tarafından idam edildi`);
+  die(c, L(`${nm(captor)} tarafından idam edildi`, `Executed by ${nm(captor)}`));
   return just;
 }
 
@@ -440,7 +442,7 @@ function tryMurder(a, b) {
   a.gold -= 30;
   if (chance(murderChance(a, b) / 100)) {
     const s = addSecret('cinayet', a.id, b.id, [a.id]);
-    die(b, pick(['Zehirlendi', 'Yatağında boğazı kesilmiş bulundu', 'Merdivenden "düştü"', 'Gizemli bir hastalık']));
+    die(b, pick(L(['Zehirlendi', 'Yatağında boğazı kesilmiş bulundu', 'Merdivenden "düştü"', 'Gizemli bir hastalık'], ['Poisoned', 'Found in bed with a slit throat', '"Fell" down the stairs', 'A mysterious illness'])));
     const exposed = chance(0.15);
     if (exposed) exposeSecret(s);
     return { ok: true, exposed };
@@ -471,11 +473,12 @@ function duel(a, b) {
   win.prestige += 25; lose.prestige -= 10;
   const r = Math.random();
   let res;
-  if (r < 0.2) { res = 'öldü'; }
-  else if (r < 0.55) { res = 'ağır yaralandı'; lose.health -= 30; addTrait(lose, 'yarali'); }
-  else res = 'yenilip teslim oldu';
-  if (res === 'öldü') die(lose, `${win.name} ${win.dyn} ile düelloda öldü`);
-  else if (lose.health <= 0) { res = 'aldığı yaralarla öldü'; die(lose, 'Düello yaraları'); }
+  let killed = false;
+  if (r < 0.2) { res = L('öldü', 'died'); killed = true; }
+  else if (r < 0.55) { res = L('ağır yaralandı', 'was badly wounded'); lose.health -= 30; addTrait(lose, 'yarali'); }
+  else res = L('yenilip teslim oldu', 'was beaten and yielded');
+  if (killed) die(lose, L(`${win.name} ${win.dyn} ile düelloda öldü`, `Killed in a duel with ${win.name} ${win.dyn}`));
+  else if (lose.health <= 0) { res = L('aldığı yaralarla öldü', 'died of their wounds'); die(lose, L('Düello yaraları', 'Duel wounds')); }
   return { win, lose, res };
 }
 function spy(a, b) {
@@ -516,11 +519,11 @@ function birth(mother, father) {
   kid.lordId = landed ? landed.id : mother.lordId;
   const p = P();
   if (mother.id === p.id || father.id === p.id || (legit && legit.id === p.id)) {
-    let m = `👶 ${mother.name} bir ${kid.female ? 'kız' : 'erkek'} çocuk doğurdu: <b>${kid.name}</b>.`;
-    if (father.id === p.id && legit && legit.id !== p.id) m += ' (Gerçek babası sensin, ama bunu sadece ikiniz biliyorsunuz.)';
-    if (kid.bastard) m += ' (Gayrimeşru)';
+    let m = L(`👶 ${mother.name} bir ${kid.female ? 'kız' : 'erkek'} çocuk doğurdu: <b>${kid.name}</b>.`, `👶 ${mother.name} gave birth to a ${kid.female ? 'daughter' : 'son'}: <b>${kid.name}</b>.`);
+    if (father.id === p.id && legit && legit.id !== p.id) m += L(' (Gerçek babası sensin, ama bunu sadece ikiniz biliyorsunuz.)', ' (You are the real father, but only the two of you know.)');
+    if (kid.bastard) m += L(' (Gayrimeşru)', ' (Illegitimate)');
     log(m, 'good');
-  } else if (relevant(mother)) log(`👶 ${nm(mother)} bir çocuk doğurdu: ${kid.name}.`, 'info');
+  } else if (relevant(mother)) log(L(`👶 ${nm(mother)} bir çocuk doğurdu: ${kid.name}.`, `👶 ${nm(mother)} gave birth: ${kid.name}.`), 'info');
   return kid;
 }
 
@@ -562,12 +565,12 @@ function npcAct(c) {
   switch (act) {
     case 'sohbet':
       t = choose(near, x => opinion(c, x) + (x.id === c.lordId ? 20 : 0));
-      if (t) { addOp(t, c, rnd(3, 8)); addOp(c, t, 3); if (t === p) log(`💬 ${nm(c)} seninle uzun uzun sohbet etti.`, 'social'); }
+      if (t) { addOp(t, c, rnd(3, 8)); addOp(c, t, 3); if (t === p) log(L(`💬 ${nm(c)} seninle uzun uzun sohbet etti.`, `💬 ${nm(c)} had a long talk with you.`), 'social'); }
       break;
     case 'hediye':
       if (c.gold < 25) break;
       t = choose(near, x => opinion(c, x) + (x.id === c.lordId ? 30 : 0));
-      if (t) { c.gold -= 10; t.gold += 10; addOp(t, c, 10); if (t === p) log(`🎁 ${nm(c)} sana 10 altınlık bir hediye gönderdi.`, 'good'); }
+      if (t) { c.gold -= 10; t.gold += 10; addOp(t, c, 10); if (t === p) log(L(`🎁 ${nm(c)} sana 10 altınlık bir hediye gönderdi.`, `🎁 ${nm(c)} sent you a gift worth 10 gold.`), 'good'); }
       break;
     case 'bastan': {
       const cands = near.filter(x => !closeKin(c, x) && !c.lovers.includes(x.id) && x.spouseId !== c.id &&
@@ -586,7 +589,7 @@ function npcAct(c) {
       if (t === p) queueEvent('evlilikTeklif', { from: c.id });
       else if (chance(marryChance(c, t) / 100)) {
         marry(c, t);
-        if (relevant(c, t)) log(`💍 ${nm(c)} ile ${nm(t)} evlendi.`, 'info');
+        if (relevant(c, t)) log(L(`💍 ${nm(c)} ile ${nm(t)} evlendi.`, `💍 ${nm(c)} and ${nm(t)} were married.`), 'info');
       }
       break;
     }
@@ -596,8 +599,8 @@ function npcAct(c) {
       {
         const r = slander(c, t);
         if (t === p) {
-          if (r.ok) log('🗣️ Hakkında çirkin dedikodular yayılıyor... (Rezalet +15)', 'bad');
-          else if (r.caught) log(`🗣️ ${nm(c)} hakkında iftira atmaya çalıştı ama yalanı ortaya çıktı.`, 'social');
+          if (r.ok) log(L('🗣️ Hakkında çirkin dedikodular yayılıyor... (Rezalet +15)', '🗣️ Ugly rumours about you are spreading... (Shame +15)'), 'bad');
+          else if (r.caught) log(L(`🗣️ ${nm(c)} hakkında iftira atmaya çalıştı ama yalanı ortaya çıktı.`, `🗣️ ${nm(c)} tried to slander you, but the lie was exposed.`), 'social');
         }
       }
       break;
@@ -614,7 +617,7 @@ function npcAct(c) {
       if (t === p) queueEvent('duelloTeklif', { from: c.id });
       else if (has(t, 'cesur') || opinion(t, c) < -30 || chance(0.4)) {
         const r = duel(c, t);
-        if (relevant(c, t)) log(`🤺 ${nm(c)} ile ${nm(t)} düello etti: ${r.lose.name} ${r.res}.`, 'info');
+        if (relevant(c, t)) log(L(`🤺 ${nm(c)} ile ${nm(t)} düello etti: ${r.lose.name} ${r.res}.`, `🤺 ${nm(c)} fought a duel with ${nm(t)}: ${r.lose.name} ${r.res}.`), 'info');
       }
       break;
     case 'casus':
@@ -639,23 +642,23 @@ function npcAct(c) {
       if (t === p) {
         const just = hasKnownCrime(c, t);
         imprison(c, t, just);
-        info('⛓️ Zindan', `${nm(c)} muhafızlarını gönderdi ve seni zindana attırdı! ${just ? 'Suçlarını biliyor.' : 'Hiçbir gerekçe göstermeden.'}<br><br>Kaçmayı deneyebilir, gardiyana rüşvet verebilir ya da kaderini bekleyebilirsin.`);
+        info(L('⛓️ Zindan', '⛓️ Dungeon'), L(`${nm(c)} muhafızlarını gönderdi ve seni zindana attırdı! ${just ? 'Suçlarını biliyor.' : 'Hiçbir gerekçe göstermeden.'}<br><br>Kaçmayı deneyebilir, gardiyana rüşvet verebilir ya da kaderini bekleyebilirsin.`, `${nm(c)} sent the guards and had you thrown in the dungeon! ${just ? 'They know your crimes.' : 'Without any justification.'}<br><br>You can try to escape, bribe a guard or await your fate.`));
       } else {
         imprison(c, t, hasKnownCrime(c, t));
-        if (relevant(c, t)) log(`⛓️ ${nm(c)}, ${nm(t)} adlı kişiyi zindana attırdı.`, 'info');
+        if (relevant(c, t)) log(L(`⛓️ ${nm(c)}, ${nm(t)} adlı kişiyi zindana attırdı.`, `⛓️ ${nm(c)} imprisoned ${nm(t)}.`), 'info');
       }
       break;
     }
     case 'yardim':
       t = choose(near.filter(x => x.gold < 10), x => -x.gold);
-      if (t && c.gold >= 10) { c.gold -= 5; t.gold += 5; addOp(t, c, 12); if (t === p) log(`🤲 ${nm(c)} sana 5 altın yardım etti.`, 'good'); }
+      if (t && c.gold >= 10) { c.gold -= 5; t.gold += 5; addOp(t, c, 12); if (t === p) log(L(`🤲 ${nm(c)} sana 5 altın yardım etti.`, `🤲 ${nm(c)} helped you with 5 gold.`), 'good'); }
       break;
     case 'sovalyelik': {
       const cands = living().filter(x => x.lordId === c.id && !x.titles.length && x.baseRank === 1 && free(x) && opinion(c, x) > 20);
       if (!cands.length) break;
       t = pick(cands);
       t.baseRank = 2; recalcRank(t); t.prestige += 30; addOp(t, c, 20);
-      if (t === p) info('⚔️ Şövalyelik', `${nm(c)} seni huzuruna çağırdı ve kılıcıyla omuzlarına dokundu.<br><br>Artık bir <b>şövalyesin</b>!`);
+      if (t === p) info(L('⚔️ Şövalyelik', '⚔️ Knighthood'), L(`${nm(c)} seni huzuruna çağırdı ve kılıcıyla omuzlarına dokundu.<br><br>Artık bir <b>şövalyesin</b>!`, `${nm(c)} summoned you and touched your shoulders with a sword.<br><br>You are now a <b>knight</b>!`));
       break;
     }
   }
@@ -665,15 +668,15 @@ function playerAssassinAttempt(c) {
   c.gold -= 30;
   if (chance(murderChance(c, p) * 0.5 / 100)) {
     addSecret('cinayet', c.id, p.id, [c.id]);
-    die(p, 'Zehirlendi (katili bilinmiyor)');
+    die(p, L('Zehirlendi (katili bilinmiyor)', 'Poisoned (killer unknown)'));
     return;
   }
   if (chance(0.5)) {
     addSecret('suikastGirisimi', c.id, p.id, [c.id, p.id]);
     addOp(p, c, -100);
     stress(p, 15);
-    info('🗡️ Suikast girişimi!', `Şarabının tadı tuhaftı... Tadına bakan hizmetkârın kıvranarak öldü.<br><br>Yakalanan zehirci her şeyi itiraf etti: onu <b>${nm(c)}</b> göndermiş!<br><br>Artık bunu biliyorsun.`);
-  } else log('🗡️ Bir hizmetkârın şüpheli bir şekilde kayboldu... Biri canına mı kastediyor?', 'bad');
+    info(L('🗡️ Suikast girişimi!', '🗡️ Murder attempt!'), L(`Şarabının tadı tuhaftı... Tadına bakan hizmetkârın kıvranarak öldü.<br><br>Yakalanan zehirci her şeyi itiraf etti: onu <b>${nm(c)}</b> göndermiş!<br><br>Artık bunu biliyorsun.`, `Your wine tasted strange... the servant who tasted it died writhing.<br><br>The captured poisoner confessed everything: <b>${nm(c)}</b> sent them!<br><br>Now you know.`));
+  } else log(L('🗡️ Bir hizmetkârın şüpheli bir şekilde kayboldu... Biri canına mı kastediyor?', '🗡️ One of your servants vanished suspiciously... Is someone after your life?'), 'bad');
 }
 
 /* ---------- Aylık işleyiş ---------- */
@@ -688,12 +691,12 @@ function prisonsTick() {
     if (x.id === p.id) {
       const harsh = has(cap, 'zalim') || opinion(cap, x) < -60;
       if (chance(harsh ? 0.07 : 0.015)) { execute(cap, x); continue; }
-      if (opinion(cap, x) > 0 && chance(0.1)) { x.prisonerOf = null; info('🔓 Özgürlük', `${nm(cap)} seni affetti ve serbest bıraktı.`); continue; }
+      if (opinion(cap, x) > 0 && chance(0.1)) { x.prisonerOf = null; info(L('🔓 Özgürlük', '🔓 Freedom'), L(`${nm(cap)} seni affetti ve serbest bıraktı.`, `${nm(cap)} pardoned you and set you free.`)); continue; }
       if (chance(0.15) && !G.queue.some(q => q.id === 'fidye')) queueEvent('fidye', { from: cap.id, amt: Math.max(15, 20 + x.rank * 30) });
     } else {
       if (chance(has(cap, 'zalim') ? 0.06 : 0.012)) {
         execute(cap, x);
-        if (relevant(x)) log(`🪓 ${nm(x)}, ${nm(cap)} tarafından idam edildi.`, 'death');
+        if (relevant(x)) log(L(`🪓 ${nm(x)}, ${nm(cap)} tarafından idam edildi.`, `🪓 ${nm(x)} was executed by ${nm(cap)}.`), 'death');
       } else if (chance(0.05)) x.prisonerOf = null;
     }
   }
@@ -719,8 +722,8 @@ function secretsTick() {
     const mult = has(l, 'durust') || has(l, 'zalim') ? 2 : 1;
     if (chance(0.06 * mult)) {
       imprison(l, a, true);
-      if (a.id === p.id) info('⛓️ Zindan', `Efendin ${nm(l)} suçunu öğrendi: <i>${secretText(s)}</i><br><br>Muhafızlar seni zincirlere vurdu.`);
-      else if (relevant(a)) log(`⛓️ ${nm(a)} suçları yüzünden zindana atıldı.`, 'info');
+      if (a.id === p.id) info(L('⛓️ Zindan', '⛓️ Dungeon'), L(`Efendin ${nm(l)} suçunu öğrendi: <i>${secretText(s)}</i><br><br>Muhafızlar seni zincirlere vurdu.`, `Your liege ${nm(l)} learned of your crime: <i>${secretText(s)}</i><br><br>The guards put you in chains.`));
+      else if (relevant(a)) log(L(`⛓️ ${nm(a)} suçları yüzünden zindana atıldı.`, `⛓️ ${nm(a)} was imprisoned for their crimes.`), 'info');
     }
   }
   // Oyuncunun suçları açığa çıkınca efendisi de tepki verebilir
@@ -729,7 +732,7 @@ function secretsTick() {
     const l = ch(p.lordId);
     if (l && free(l) && chance(0.04 * (has(l, 'durust') ? 2 : 1))) {
       imprison(l, p, true);
-      info('⛓️ Zindan', `Suçların herkesin dilinde. Efendin ${nm(l)} seni zindana attırdı.`);
+      info(L('⛓️ Zindan', '⛓️ Dungeon'), L(`Suçların herkesin dilinde. Efendin ${nm(l)} seni zindana attırdı.`, `Everyone is talking about your crimes. Your liege ${nm(l)} had you imprisoned.`));
     }
   }
 }
@@ -740,7 +743,7 @@ function grantTick() {
     for (const t of spare) {
       if (!chance(0.25)) continue;
       const cands = living().filter(x => isAdult(x) && free(x) && !x.titles.length &&
-        (x.lordId === c.id || (familyRel(c, x) === 'Çocuk' && !x.bastard)));
+        (x.lordId === c.id || (familyRel(c, x) === 'cocuk' && !x.bastard)));
       if (!cands.length) continue;
       let best = null, bs = -1e9;
       for (const x of cands) {
@@ -750,8 +753,8 @@ function grantTick() {
       giveTitle(t, best);
       addOp(best, c, 40);
       best.prestige += 50;
-      if (best.id === G.playerId) info('🏰 Unvan!', `${nm(c)} sana <b>${t.name}</b> unvanını bağışladı!<br><br>Artık topraklarının efendisisin.`);
-      else if (relevant(c, best)) log(`🏰 ${nm(c)}, ${t.name} unvanını ${nm(best)} adlı kişiye verdi.`, 'info');
+      if (best.id === G.playerId) info(L('🏰 Unvan!', '🏰 Title!'), L(`${nm(c)} sana <b>${t.name}</b> unvanını bağışladı!<br><br>Artık topraklarının efendisisin.`, `${nm(c)} granted you <b>${t.name}</b>!<br><br>You are now lord of your own lands.`));
+      else if (relevant(c, best)) log(L(`🏰 ${nm(c)}, ${t.name} unvanını ${nm(best)} adlı kişiye verdi.`, `🏰 ${nm(c)} granted ${t.name} to ${nm(best)}.`), 'info');
       break;
     }
   }
@@ -768,7 +771,7 @@ function fillVacant() {
     if (!pool.length) continue;
     pool.sort((a, b) => b.prestige - a.prestige);
     giveTitle(t, pool[0]);
-    if (relevant(pool[0])) log(`👑 ${t.name} boş kaldı ve ${nm(pool[0])} tarafından alındı.`, 'info');
+    if (relevant(pool[0])) log(L(`👑 ${t.name} boş kaldı ve ${nm(pool[0])} tarafından alındı.`, `👑 ${t.name} was vacant and was claimed by ${nm(pool[0])}.`), 'info');
   }
 }
 function birthsTick() {
@@ -793,8 +796,8 @@ function healthTick(c) {
   if (c.age < 3) pd += 0.002;
   if (c.health < 30) pd += 0.03;
   if (has(c, 'ayyas')) pd += 0.002;
-  if (c.health <= 0) die(c, 'Sağlığı tükendi');
-  else if (chance(pd)) die(c, c.age < 5 ? 'Çocuk hastalığı' : c.age > 55 ? 'Yaşlılık' : pick(['Ateşli bir hastalık', 'Veba', 'Kalp krizi', 'Kötü bir yara enfeksiyonu']));
+  if (c.health <= 0) die(c, L('Sağlığı tükendi', 'Health gave out'));
+  else if (chance(pd)) die(c, c.age < 5 ? L('Çocuk hastalığı', 'Childhood illness') : c.age > 55 ? L('Yaşlılık', 'Old age') : pick(L(['Ateşli bir hastalık', 'Veba', 'Kalp krizi', 'Kötü bir yara enfeksiyonu'], ['A burning fever', 'Plague', 'A failing heart', 'An infected wound'])));
 }
 function decayTick() {
   for (const c of living()) {
@@ -814,7 +817,7 @@ function populationTick() {
     const p = P();
     const movers = all.filter(c => c.id !== p.id && isAdult(c) && c.rank <= 1 && !c.titles.length && !c.prisonerOf &&
       !relevant(c) && !all.some(x => x.lordId === c.id));
-    for (const c of shuffle(movers).slice(0, Math.min(6, all.length - 420))) die(c, 'Diyardan göç etti');
+    for (const c of shuffle(movers).slice(0, Math.min(6, all.length - 420))) die(c, L('Diyardan göç etti', 'Left the land'));
   }
   pruneTick();
   const adults = living().filter(isAdult).length;

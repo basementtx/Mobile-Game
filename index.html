@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <title>Taç ve Hançer</title>
-  <meta name="description" content="1180 yılında, gerçek dünya haritasında entrika, savaş ve hanedan oyunu.">
+  <title>Crown &amp; Dagger</title>
+  <meta name="description" content="A turn-based medieval game of intrigue, war and dynasty on a real map of the world in 1180.">
   <meta name="theme-color" content="#14100c">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -26,10 +26,10 @@
     <div id="hudR" class="hud"></div>
     <div id="status" class="hidden"></div>
     <nav id="tools"></nav>
-    <div id="joy" class="joy"><div class="knob"></div></div>
     <div id="ctxbar"></div>
+    <button id="endturn"></button>
     <div id="popup" class="hidden"></div>
-    <aside id="drawer" class="hidden"><header><span class="dtitle"></span><button class="dx" aria-label="Kapat">✕</button></header><div class="dbody"></div></aside>
+    <aside id="drawer" class="hidden"><header><span class="dtitle"></span><button class="dx" aria-label="Close">✕</button></header><div class="dbody"></div></aside>
   </div>
   <div id="battle" class="screen hidden">
     <canvas id="bcv"></canvas>
@@ -39,12 +39,14 @@
     <div id="border"></div>
   </div>
   <div id="modal" class="hidden"></div>
-  <div id="rotate" class="hidden"><div><div class="rot">📱↻</div><h2>Telefonu yan çevir</h2><p>Taç ve Hançer yatay ekranda oynanır.</p><button class="ghost">Yine de dikey devam et</button></div></div>
+  <div id="rotate" class="hidden"><div><div class="rot">📱↻</div><h2>Rotate your phone</h2><p>Crown &amp; Dagger is played in landscape.</p><button class="ghost">Continue in portrait anyway</button></div></div>
   <!-- @@END -->
+  <script src="js/i18n.js"></script>
   <script src="js/data.js"></script>
   <script src="js/geo.js"></script>
   <script src="js/engine.js"></script>
   <script src="js/world.js"></script>
+  <script src="js/provinces.js"></script>
   <script src="js/actions.js"></script>
   <script src="js/events.js"></script>
   <script src="js/map.js"></script>
