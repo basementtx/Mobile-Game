@@ -304,13 +304,24 @@ function renderSheet() {
 }
 
 /* ---------- Eylem yürütme ---------- */
-function doAction(aid, tid) {
+/* Tarayıcı confirm() penceresi bazı ortamlarda engellendiği için oyun içi onay */
+function askConfirm(text, onYes, onNo) {
+  const back = UI.modal === 'sheet' ? UI.sheet : null;
+  showModal(`<div class="event"><h2>Emin misin?</h2><div class="etext">${text}</div>
+    <div class="eopts"><button class="opt primary" data-yes>Evet, yap</button><button class="opt" data-no>Vazgeç</button></div></div>`, 'confirm');
+  const m = $('#modal');
+  m.querySelector('[data-yes]').onclick = () => { closeModal(); if (back != null) UI.sheet = back, UI.modal = 'sheet'; onYes(); };
+  m.querySelector('[data-no]').onclick = () => { closeModal(); if (onNo) onNo(); else if (back != null) openSheet(back); };
+}
+function doAction(aid, tid, confirmed) {
   const a = ACTION_MAP[aid], p = P(), t = tid != null ? ch(tid) : null;
   if (!a || G.over) return;
   if (G.ap < a.ap) return toast('Bu ay eylem hakkın kalmadı. Ayı bitir.');
   const reason = a.req(p, t);
   if (reason) return toast(reason);
-  if (a.confirm && !confirm(typeof a.confirm === 'function' ? a.confirm(t) : a.confirm)) return;
+  if (a.confirm && !confirmed) {
+    return askConfirm(esc(typeof a.confirm === 'function' ? a.confirm(t) : a.confirm), () => doAction(aid, tid, true));
+  }
   G.ap -= a.ap;
   const msg = a.run(p, t);
   if (msg) log(msg, 'player');
@@ -324,7 +335,8 @@ function doAction(aid, tid) {
   }
   if (msg) toast(msg);
   renderGame();
-  if (UI.modal === 'sheet') renderSheet();
+  if (UI.modal === 'sheet' && UI.sheet != null) renderSheet();
+  else closeModal();
 }
 
 /* ---------- Modal ---------- */
@@ -385,7 +397,7 @@ function openMenu() {
     <p class="small muted">Oyun her eylemden sonra otomatik kaydedilir.</p></div>`, 'menu');
   const m = $('#modal');
   m.querySelector('[data-close]').onclick = closeModal;
-  $('#mNew').onclick = () => { if (confirm('Mevcut oyun silinecek. Emin misin?')) { deleteSave(); G = null; closeModal(); renderSetup(); } };
+  $('#mNew').onclick = () => askConfirm('Mevcut oyunun silinecek ve yeni bir hikâye başlayacak.', () => { deleteSave(); G = null; closeModal(); renderSetup(); }, () => {});
   $('#mHelp').onclick = () => { showModal(`<div class="sheet"><button class="x" data-close>✕</button><h2>❓ Nasıl oynanır?</h2>
     <div class="help">
     <p><b>Her ay 3 eylem hakkın var.</b> Harcayınca <b>Ayı Bitir</b>. Dünya da senin gibi yaşıyor: herkes entrika çeviriyor, evleniyor, aldatıyor, öldürüyor.</p>
