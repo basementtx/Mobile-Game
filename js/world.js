@@ -4,9 +4,9 @@
    kuşatmalar, eşkıyalar, zaman akışı
    ========================================================= */
 
-const DAY_SEC = 0.26;        // tur çözülürken 1x hızda bir günün gerçek saniyesi
+const DAY_SEC = 0.45;        // tur çözülürken 1x hızda bir günün gerçek saniyesi (hareket animasyonu)
 const TURN_DAYS = 5;         // bir tur kaç gün sürer
-const SIEGE_DAYS = 5;        // hücuma kadar kuşatma süresi
+const SIEGE_DAYS = 12;       // NPC'lerin hücuma kadar kuşatma süresi
 const CONTACT = 0.32;        // iki ordunun karşılaşma mesafesi (harita birimi)
 const ENTER_DIST = 0.4;      // şehre girme mesafesi
 
@@ -165,10 +165,11 @@ function partySpeed(pt) {
   const n = troopCount(pt);
   let cav = 0;
   for (const k in pt.troops) if (TROOPS[k].sinif === 'atli') cav += pt.troops[k];
-  let v = 0.62 + (n ? 0.3 * cav / n : 0.3) - Math.min(0.25, n * 0.0011);
-  if (pt.kind === 'bandit') v = 0.6;
-  if (!isLand(pt.x, pt.y)) v *= 0.65;
-  return Math.max(0.3, v);
+  // Ortaçağ ordusu günde ~20-35 km yürür (1 harita birimi ≈ 111 km)
+  let v = 0.24 + (n ? 0.12 * cav / n : 0.12) - Math.min(0.06, n * 0.0003);
+  if (pt.kind === 'bandit') v = 0.22;
+  if (!isLand(pt.x, pt.y)) v *= 0.7;
+  return Math.max(0.15, v);
 }
 function troopMix(cul, n, rich) {
   const east = CULTURES[cul] && CULTURES[cul].east;
@@ -336,6 +337,7 @@ function aiParty(pt) {
   if (pt.kind === 'bandit') {
     const prey = near.filter(o => hostileParties(pt, o) && dist(pt, o) < 2.8 && partyPower(o) < pow * 0.8);
     if (prey.length) { pt.chase = prey[0].id; pt.mode = 'chase'; return; }
+    if (pt.mode === 'wander' && pt.tx == null && chance(0.8)) return; // vardığı yerde bir süre konaklar
     if (pt.mode !== 'wander' || pt.tx == null || Math.hypot(pt.tx - pt.x, pt.ty - pt.y) < 0.2) {
       const [x, y] = randomLandNear(pt.hx, pt.hy, 2.5);
       setGoal(pt, x, y, 'wander');
@@ -366,7 +368,7 @@ function aiParty(pt) {
   if (foes.length) {
     const prey = near.filter(o => hostileParties(pt, o) && dist(pt, o) < 5 && partyPower(o) < pow * 0.9 && o.kind !== 'bandit');
     if (prey.length) { prey.sort((a, b) => dist(pt, a) - dist(pt, b)); pt.chase = prey[0].id; pt.mode = 'chase'; return; }
-    const targets = settlements().filter(s => s.holder != null && foes.some(f => f.id === s.liege) && dist(pt, s) < 12 && garrisonPower(s) < pow * 0.85);
+    const targets = settlements().filter(s => s.holder != null && foes.some(f => f.id === s.liege) && dist(pt, s) < 8 && garrisonPower(s) < pow * 0.8);
     if (targets.length) {
       targets.sort((a, b) => dist(pt, a) - dist(pt, b));
       const s = targets[0];
@@ -376,6 +378,8 @@ function aiParty(pt) {
   }
   const bandits = near.filter(o => o.kind === 'bandit' && dist(pt, o) < 3 && partyPower(o) < pow * 0.8);
   if (bandits.length) { pt.chase = bandits[0].id; pt.mode = 'chase'; return; }
+  if (pt.mode === 'patrol' && pt.tx == null && chance(0.8)) return; // devriye noktasında bir süre bekler
+  if ((pt.mode === 'idle' || pt.mode === 'home') && chance(0.6)) return; // her lord sürekli sefere çıkmaz
   if (pt.mode !== 'patrol' || pt.tx == null || Math.hypot(pt.tx - pt.x, pt.ty - pt.y) < 0.15) {
     const own = settlementsOf(c);
     const base = own.length ? pick(own) : home;
@@ -413,7 +417,7 @@ function moveParty(pt, dtDays) {
 }
 /* ---------- Tur tabanlı oyuncu hareketi ---------- */
 /* Bir turda kaç il ilerlenebilir (deniz geçişi 2 puan) */
-function movePoints(pt) { return Math.max(1, Math.round(partySpeed(pt) * 3.6)); }
+function movePoints(pt) { return Math.max(1, Math.round(partySpeed(pt) * TURN_DAYS / 1.1)); }
 function partyProv(pt) { return pt ? provinceAt(pt.x, pt.y) : null; }
 /* Oyuncuya bir hedef il ver. Dönüş: yol ya da null (ulaşılamaz) */
 function orderMove(toProv) {
@@ -552,7 +556,7 @@ function respawnParties() {
     if (chance(0.5)) spawnLordParty(c);
   }
   const bandits = G.parties.filter(p => p.kind === 'bandit').length;
-  for (let i = bandits; i < 16; i++) spawnBandits();
+  for (let i = bandits; i < 8; i++) spawnBandits();
   const p = P();
   if (free(p) && isAdult(p) && !playerParty()) {
     const pr = realmOf(p);
@@ -609,7 +613,7 @@ function realmPolitics() {
     const k = ch(r.holder);
     if (!k || !free(k) || k.id === p.id) continue;
     const foes = enemiesOf(r);
-    if (foes.length < 1 && chance(0.035)) {
+    if (foes.length < 1 && chance(0.012)) {
       const mine = realmSettlements(r);
       const cands = realms().filter(o => o !== r && ch(o.holder) && realmSettlements(o).some(s => mine.some(m => dist(m, s) < 7)));
       if (cands.length) {
@@ -631,13 +635,13 @@ function realmPolitics() {
       if (months > 4 && chance(0.06)) queueEvent('barisTeklif', { r: ra === pr ? rb.id : ra.id });
       continue;
     }
-    if (chance(0.025 + months * 0.006)) makePeace(ra, rb);
+    if (chance(0.04 + months * 0.01)) makePeace(ra, rb);
   }
   for (const c of living()) {
     if (c.id === p.id || !free(c) || settlementsOf(c).length < 2 || ownRealm(c) || c.lordId == null) continue;
     const l = ch(c.lordId);
     if (!l || opinion(c, l) > -45 || !(has(c, 'hirsli') || has(c, 'kibirli')) || l.dread > 40) continue;
-    if (chance(0.015) && charPower(c) > charPower(l) * 0.35) rebel(c);
+    if (chance(0.005) && charPower(c) > charPower(l) * 0.35) rebel(c);
   }
 }
 
@@ -735,9 +739,9 @@ function newWorld(opt) {
   for (const c of living()) if (c.rank >= 3 && c.id !== p.id) spawnLordParty(c);
   const startTroops = { koylu: {}, sovalye: R.kul === 'turk' || R.kul === 'arap' ? { milis: 6, atliokcu: 4 } : { milis: 6, piyade: 4 }, lord: troopMix(R.kul, 30) }[opt.start];
   makeParty({ owner: p.id, kind: 'player', x: startS.x, y: startS.y, troops: startTroops, path: [] });
-  for (let i = 0; i < 16; i++) spawnBandits();
+  for (let i = 0; i < 8; i++) spawnBandits();
   const W = (a, b) => { const ra = rt[a], rb = rt[b]; if (ra && rb) G.wars.push({ a: ra.id, b: rb.id, start: 0, taken: { [ra.id]: 0, [rb.id]: 0 } }); };
-  W('eyyubi', 'kudus'); W('muvahhid', 'kastilya'); W('muvahhid', 'portekiz'); W('selcuklu', 'bizans');
+  W('eyyubi', 'kudus'); W('selcuklu', 'bizans');
   for (const c of living()) {
     if (chance(0.12) && isAdult(c)) {
       const others = nearby(c).filter(x => x.id !== p.id && !closeKin(c, x));

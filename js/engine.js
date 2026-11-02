@@ -850,7 +850,7 @@ function pruneTick() {
 function randomEventTick() {
   const p = P();
   if (p.stress >= 100 && !G.queue.some(q => q.id === 'cokus')) { queueEvent('cokus', {}); return; }
-  if (G.queue.length || !chance(0.45)) return;
+  if (G.queue.length || !chance(0.3)) return;
   const opts = [];
   for (const [k, e] of Object.entries(EVENTS)) {
     if (!e.w) continue;
@@ -867,7 +867,7 @@ function randomEventTick() {
 function monthTick() {
   if (G.over) return;
   const all = living();
-  for (const c of shuffle(all.slice())) if (c.alive && c.id !== G.playerId && chance(0.12)) npcAct(c);
+  for (const c of shuffle(all.slice())) if (c.alive && c.id !== G.playerId && chance(0.06)) npcAct(c);
   prisonsTick();
   secretsTick();
   grantTick();

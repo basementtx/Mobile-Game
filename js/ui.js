@@ -263,7 +263,6 @@ function updateHUD() {
   else sub = L(`${TURN_DAYS} gün geçer`, `${TURN_DAYS} days pass`);
   setHTML($('#endturn'), `<b>${busy ? '⏳' : L('TURU BİTİR', 'END TURN')}</b><small>${sub}</small>`);
   $('#endturn').classList.toggle('busy', busy);
-  const tw = $('#tools').offsetWidth; if (tw && tw !== UI._tw) { UI._tw = tw; document.documentElement.style.setProperty('--tw', tw + 'px'); }
   const wars = enemiesOf(realmOf(p));
   if (!status && busy) status = L('⏳ Zaman akıyor…', '⏳ Time passes…');
   if (!status && wars.length) status = L(`⚔️ Savaşta: ${wars.map(r => esc(r.name)).join(', ')}`, `⚔️ At war: ${wars.map(r => esc(r.name)).join(', ')}`);

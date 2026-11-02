@@ -319,3 +319,17 @@ button.wide { display: block; width: 100%; text-align: left; background: var(--h
 #endturn { right: calc(16px + var(--sr) + var(--tw, 58px) * var(--ui)); }
 #tools { display: grid; grid-auto-flow: column; grid-template-rows: repeat(auto-fill, 43px); grid-auto-columns: 56px; }
 #tools button { height: 43px; justify-content: center; border-left: 1px solid var(--seam); }
+
+/* ---------- Menü: sol altta tek sıra (yatay), yukarı uzamaz ----------
+   Bağlam düğmeleri (şehre gir, kuşat, rotayı iptal) TURU BİTİR'in üstünde, sağda. */
+#tools { top: auto; right: auto; left: calc(8px + var(--sl)); bottom: calc(10px + var(--sb));
+  transform: scale(var(--ui)); transform-origin: bottom left;
+  display: flex; flex-direction: row; flex-wrap: nowrap; max-height: none; height: auto;
+  max-width: calc((100vw - 16px - var(--sl) - var(--sr) - 200px * var(--ui)) / var(--ui)); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+#tools::-webkit-scrollbar { display: none; }
+#tools button { flex: none; width: 58px; height: 50px; border: 0; border-right: 1px solid var(--seam); border-bottom: 0; }
+#tools button:last-child { border-right: 0; }
+#endturn { right: calc(8px + var(--sr)); bottom: calc(10px + var(--sb)); }
+#ctxbar { left: auto; right: calc(8px + var(--sr)); bottom: calc(10px + var(--sb) + 66px * var(--ui)); transform-origin: bottom right;
+  justify-content: flex-end; max-width: calc(50vw / var(--ui)); }
+@media (max-height: 420px) { #tools button { width: 54px; height: 46px; } }

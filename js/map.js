@@ -284,30 +284,66 @@ function armyGroups(list, pp) {
   return [...groups.values()].sort((a, b) => b.isP - a.isP || b.hostile - a.hostile || b.n - a.n);
 }
 function fmtCount(n) { return n >= 10000 ? Math.round(n / 1000) + 'k' : n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n); }
+/* Ordular rozet olarak gerçek konumlarında çizilir: duran ordular il merkezinde toplanır,
+   yürüyen ordular yolda akıcı biçimde ilerler ve gittikleri yer kesik çizgiyle gösterilir. */
+function partyDest(pt) {
+  if (pt.chase != null) { const t = G.parties.find(x => x.id === pt.chase); return t ? [t.x, t.y] : null; }
+  if (pt.kind === 'player') { if (pt.leg && G.turnLeft > 0) return pt.leg.pts[pt.leg.pts.length - 1]; return null; }
+  return pt.tx != null ? [pt.tx, pt.ty] : null;
+}
 function drawArmyBadges(ctx, W, H, z, pp, SETTS) {
-  const byProv = armiesByProvince();
+  const clusters = new Map();
+  for (const pt of G.parties) {
+    const pv = partyProv(pt);
+    if (!pv) continue;
+    const still = Math.abs(pv.x - pt.x) < 0.06 && Math.abs(pv.y - pt.y) < 0.06;
+    const key = still ? 'p' + pv.id : 'm' + pt.id;
+    let c = clusters.get(key);
+    if (!c) clusters.set(key, c = { pv: still ? pv : null, x: still ? pv.x : pt.x, y: still ? pv.y : pt.y, list: [] });
+    c.list.push(pt);
+  }
+  // 1) Yürüyüş çizgileri (rozetlerin altında)
+  ctx.save();
+  ctx.lineCap = 'round';
+  for (const pt of G.parties) {
+    if (pt.kind === 'player') continue;
+    const dst = partyDest(pt);
+    if (!dst || Math.hypot(dst[0] - pt.x, dst[1] - pt.y) < 0.08) continue;
+    const hostile = pp && hostileParties(pp, pt);
+    if (z < 14 && !(hostile && pt.kind !== 'bandit')) continue;
+    const [ax, ay] = mapToScreen(pt.x, pt.y), [bx, by] = mapToScreen(dst[0], dst[1]);
+    if (Math.max(ax, bx) < -20 || Math.min(ax, bx) > W + 20 || Math.max(ay, by) < -20 || Math.min(ay, by) > H + 20) continue;
+    const c = ch(pt.owner), r = c ? realmOf(c) : null;
+    const col = hostile ? '#ff6a55' : pt.kind === 'bandit' ? '#d8d0c0' : r ? r.color : '#d8d0c0';
+    ctx.setLineDash([]); ctx.lineWidth = 3.2; ctx.strokeStyle = 'rgba(10,8,5,0.55)';
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+    ctx.setLineDash([6, 4]); ctx.lineWidth = 1.6; ctx.strokeStyle = col;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+    // hedef işareti: küçük baklava
+    ctx.setLineDash([]); ctx.fillStyle = col; ctx.strokeStyle = 'rgba(10,8,5,0.9)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(bx, by - 4.5); ctx.lineTo(bx + 4.5, by); ctx.lineTo(bx, by + 4.5); ctx.lineTo(bx - 4.5, by); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  ctx.restore();
+  // 2) Rozetler
   const fs = clamp(z * 0.4, 9, 12), h = Math.round(fs + 6), sq = h - 4;
   ctx.font = `700 ${fs}px system-ui, -apple-system, sans-serif`;
   ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-  for (const [pid, list] of byProv) {
-    const pv = PROV[pid];
-    let [sx, sy] = mapToScreen(pv.x, pv.y);
+  const order = [...clusters.values()].sort((a, b) => a.list.some(p => p.kind === 'player') - b.list.some(p => p.kind === 'player'));
+  for (const cl of order) {
+    const [sx, sy] = mapToScreen(cl.x, cl.y);
     if (sx < -80 || sx > W + 80 || sy < -30 || sy > H + 30) continue;
-    let groups = armyGroups(list, pp);
+    let groups = armyGroups(cl.list, pp);
     if (z < 14) groups = groups.filter(g => g.isP || (g.hostile && !g.bandit));
     if (!groups.length) continue;
-    // Uzaktan bakarken ilde tek rozet: önce oyuncu, sonra düşman, sonra en büyük; başka taraf varsa "+"
     let more = false;
     if (z < 24 && groups.length > 1) { more = true; groups = [groups[0]]; }
-    // Yerleşim ilinde rozetler kalenin altına (adın üstüne) gelir
-    const sett = pv.sett >= 0;
+    const pv = cl.pv, sett = pv && pv.sett >= 0;
     const size = clamp(z * 0.22, 4, 9) * 1.15;
     const label = g => fmtCount(g.n) + (more ? '+' : '');
     const widths = groups.map(g => sq + 6 + ctx.measureText(label(g)).width + 5);
     const total = widths.reduce((a, b) => a + b, 0) + (groups.length - 1) * 3;
     let x = sx - total / 2;
-    // Yerleşim ilinde rozet, şehir adının altına gelir
-    const named = z >= 16 || (SETTS[pv.sett] && SETTS[pv.sett].capital);
+    const named = sett && (z >= 16 || (SETTS[pv.sett] && SETTS[pv.sett].capital));
     const y = sett ? sy + size + 3 + (named ? clamp(z * 0.42, 10, 15) + 4 : 0) : sy - h / 2;
     groups.forEach((g, i) => {
       const w = widths[i];
@@ -330,7 +366,7 @@ function drawArmyBadges(ctx, W, H, z, pp, SETTS) {
 function routePreview(pp) {
   let from = partyProv(pp);
   if (!from) return null;
-  const pts = [[from.x, from.y]], stops = [];
+  const pts = [[pp.x, pp.y]], stops = [];
   if (pp.leg && G.turnLeft > 0) {
     const e = pp.leg.pts[pp.leg.pts.length - 1];
     pts.push(e); stops.push({ x: e[0], y: e[1], n: 1 });
