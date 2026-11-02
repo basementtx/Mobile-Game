@@ -170,39 +170,56 @@ function buildProvinces() {
   for (const pv of PROV) { const k = hk(pv.x, pv.y); let a = _provHash.get(k); if (!a) _provHash.set(k, a = []); a.push(pv.id); }
 }
 
-/* Kenarı ara noktalarla kır (orta nokta kaydırma): gerçek sınırlara benzeyen kıvrımlı çizgi */
+/* Kenarı ara noktalarla kır (orta nokta kaydırma): gerçek sınırlara benzeyen kıvrımlı çizgi.
+   Her nokta oluştuğu derinliği taşır (q[2]); düşük derinlikli noktalar kaba ayrıntı düzeyini (LOD) verir. */
+const LOD_MIN = 2, LOD_MAX = 6;
 function roughLine(x1, y1, x2, y2, rand) {
-  const out = [[x1, y1]];
+  const out = [[x1, y1, -1]];
   const rec = (ax, ay, bx, by, amp, depth) => {
     const len = Math.hypot(bx - ax, by - ay);
-    if (len < 0.05 || depth > 7) { out.push([bx, by]); return; }
+    if (len < 0.07 || depth >= LOD_MAX) { out.push([bx, by, -1]); return; }
     const nx = -(by - ay) / len, ny = (bx - ax) / len;
     const o = (rand() * 2 - 1) * amp * len, t = 0.38 + rand() * 0.24;
     const mx = ax + (bx - ax) * t + nx * o, my = ay + (by - ay) * t + ny * o;
     rec(ax, ay, mx, my, amp * 0.72, depth + 1);
+    out[out.length - 1][2] = depth; // az önce eklenen orta nokta
     rec(mx, my, bx, by, amp * 0.72, depth + 1);
   };
   rec(x1, y1, x2, y2, 0.3, 0);
+  out[out.length - 1][2] = -1;
   return out;
 }
+const lodOf = (pts, k) => pts.filter(q => q[2] < k);
 function roughenBorders() {
   const lines = new Map();
   for (const e of PROV_EDGES) {
     e.pts = roughLine(e.x1, e.y1, e.x2, e.y2, mulberry32(e.a * 7919 + e.b * 104729 + 17));
-    lines.set(e.a + ',' + e.b, e.pts);
+    e.lod = [];
+    for (let k = LOD_MIN; k <= LOD_MAX; k++) e.lod[k] = lodOf(e.pts, k);
+    lines.set(e.a + ',' + e.b, e);
   }
   for (const pv of PROV) {
-    const P = pv.poly, n = P.length, out = [];
-    for (let i = 0; i < n; i++) {
-      const j = P[i][2];
-      const line = j >= 0 ? (pv.id < j ? lines.get(pv.id + ',' + j) : lines.get(j + ',' + pv.id)) : null;
-      if (!line) { out.push(P[i]); continue; }
-      const seq = pv.id < j ? line : line.slice().reverse();
-      for (let k = 0; k < seq.length - 1; k++) out.push(seq[k]);
+    pv.lod = [];
+    for (let k = LOD_MIN; k <= LOD_MAX; k++) {
+      const P = pv.poly, n = P.length, out = [];
+      for (let i = 0; i < n; i++) {
+        const j = P[i][2];
+        const ed = j >= 0 ? (pv.id < j ? lines.get(pv.id + ',' + j) : lines.get(j + ',' + pv.id)) : null;
+        if (!ed) { out.push(P[i]); continue; }
+        const line = ed.lod[k];
+        const seq = pv.id < j ? line : line.slice().reverse();
+        for (let q = 0; q < seq.length - 1; q++) out.push(seq[q]);
+      }
+      pv.lod[k] = out;
     }
-    pv.rough = out;
+    pv.rough = pv.lod[LOD_MAX];
   }
+  const bbox = pts => { let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity; for (const q of pts) { if (q[0] < a) a = q[0]; if (q[0] > c) c = q[0]; if (q[1] < b) b = q[1]; if (q[1] > d) d = q[1]; } return [a, b, c, d]; };
+  for (const pv of PROV) pv.bb = bbox(pv.rough);
+  for (const e of PROV_EDGES) e.bb = bbox(e.pts);
 }
+/* Yakınlaştırmaya göre ayrıntı düzeyi: kenar parçaları ekranda ~5 piksel olsun */
+function lodFor(z) { return Math.max(LOD_MIN, Math.min(LOD_MAX, Math.round(Math.log2(z / 4)))); }
 function pointInPoly(x, y, poly) {
   let ins = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {

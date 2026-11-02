@@ -7,7 +7,7 @@
 const CAM = { x: 30, y: 25, z: 26, follow: true };
 const JOY = { active: false, vx: 0, vy: 0, id: null };
 let MAPCV = null, MCTX = null, LANDPATH = null, SEAPAT = null;
-let PROVPATH = null, TERR = null;
+let TERR = null;
 const PARTY_SCREEN = new Map(); // ordu id -> çizildiği ekran noktası (dokunma için) // TERR: { fills: [[renk, Path2D]], realmBorder: Path2D }
 
 /* ---------- Joystick (savaş ekranı) ---------- */
@@ -52,8 +52,6 @@ function setupMap(cv) {
     for (let i = 1; i < r.length; i++) LANDPATH.lineTo(r[i][0], r[i][1]);
     LANDPATH.closePath();
   }
-  PROVPATH = new Path2D();
-  for (const e of PROV_EDGES) linePath(PROVPATH, e.pts);
   // Deniz dokusu: ince, keskin yatay çizgiler
   const t = document.createElement('canvas'); t.width = t.height = 48;
   const c = t.getContext('2d');
@@ -69,6 +67,7 @@ function resizeMap() {
   const d = Math.min(2, window.devicePixelRatio || 1);
   MAPCV.width = MAPCV.clientWidth * d; MAPCV.height = MAPCV.clientHeight * d;
   MAPCV._d = d;
+  if (typeof invalidateMap === 'function') invalidateMap();
 }
 function linePath(path, pts) {
   path.moveTo(pts[0][0], pts[0][1]);
@@ -87,22 +86,8 @@ function provOwnerKey(pv) {
   return s.holder != null ? 'h' + s.holder : 'wild';
 }
 function buildTerritory() {
-  const groups = new Map();
   const keys = PROV.map(provOwnerKey);
-  PROV.forEach((pv, i) => {
-    const k = keys[i];
-    if (k === 'wild') return;
-    let g = groups.get(k);
-    if (!g) {
-      const r = G.titles[k];
-      g = { col: r ? r.color : '#9a9080', path: new Path2D(), mine: false };
-      groups.set(k, g);
-    }
-    polyPath(g.path, pv.rough);
-  });
-  const border = new Path2D();
-  for (const e of PROV_EDGES) if (keys[e.a] !== keys[e.b]) linePath(border, e.pts);
-  TERR = { fills: [...groups.values()], border, keys };
+  TERR = { keys, col: keys.map(k => (k === 'wild' ? null : G.titles[k] ? G.titles[k].color : '#9a9080')) };
   G.terrDirty = false;
 }
 
@@ -116,41 +101,98 @@ function mapToScreen(x, y) {
   return [(x - CAM.x) * CAM.z + w / 2, (y - CAM.y) * CAM.z + h / 2];
 }
 
-/* ---------- Çizim ---------- */
-function drawMap(time) {
-  if (!MAPCV || !G) return;
-  const pp = playerParty();
-  if (CAM.follow && pp) { CAM.x += (pp.x - CAM.x) * 0.2; CAM.y += (pp.y - CAM.y) * 0.2; }
-  if (G.terrDirty || !TERR) buildTerritory();
-  const ctx = MCTX, d = MAPCV._d, W = MAPCV.width / d, H = MAPCV.height / d;
+/* ---------- Çizim ----------
+   Ağır kısım (deniz, kara, iller, sınırlar) ekran + kenar payı büyüklüğünde
+   ayrı bir tuvale bir kez çizilir (BASE); her karede yalnızca o resim kaydırılır
+   ve üstüne hafif katman (yerleşimler, ordular, rota) çizilir. */
+const BASE = { cv: null, ok: false, z: 0, cx: 0, cy: 0, W: 0, H: 0, d: 0, sel: null, zt: 0 };
+const BASE_M = 0.4; // her yanda ekranın %40'ı kadar pay
+function renderBase(W, H, d) {
+  const z = CAM.z, BW = Math.ceil(W * (1 + 2 * BASE_M)), BH = Math.ceil(H * (1 + 2 * BASE_M));
+  if (!BASE.cv) BASE.cv = document.createElement('canvas');
+  const cv = BASE.cv;
+  if (cv.width !== BW * d || cv.height !== BH * d) { cv.width = BW * d; cv.height = BH * d; }
+  const ctx = cv.getContext('2d'), px = 1 / z;
   ctx.setTransform(d, 0, 0, d, 0, 0);
-  ctx.imageSmoothingEnabled = false;
-  // Deniz
-  ctx.fillStyle = '#183440'; ctx.fillRect(0, 0, W, H);
-  ctx.save(); ctx.translate((-CAM.x * CAM.z) % 48, (-CAM.y * CAM.z) % 48); ctx.fillStyle = SEAPAT; ctx.fillRect(-48, -48, W + 96, H + 96); ctx.restore();
-  const z = CAM.z, px = 1 / z;
-  ctx.setTransform(d * z, 0, 0, d * z, d * (W / 2 - CAM.x * z), d * (H / 2 - CAM.y * z));
-  // Kara: keskin, gölgesiz; kıyı için tek bir koyu öteleme
-  ctx.save(); ctx.translate(2.5 * px, 2.5 * px); ctx.fillStyle = 'rgba(8,16,20,0.55)'; ctx.fill(LANDPATH); ctx.restore();
-  ctx.fillStyle = '#b7a57c'; ctx.fill(LANDPATH);
-  ctx.save(); ctx.clip(LANDPATH);
-  // İller: krallık renkleri (her krallık tek yol → iç dikiş yok)
+  ctx.fillStyle = '#183440'; ctx.fillRect(0, 0, BW, BH);
+  ctx.setTransform(d * z, 0, 0, d * z, d * (BW / 2 - CAM.x * z), d * (BH / 2 - CAM.y * z));
+  // Yalnızca görünen alandaki kara, iller ve sınırlar (kırpma)
+  const x0 = CAM.x - BW / 2 / z, x1 = CAM.x + BW / 2 / z, y0 = CAM.y - BH / 2 / z, y1 = CAM.y + BH / 2 / z;
+  const vis = b => b[2] >= x0 && b[0] <= x1 && b[3] >= y0 && b[1] <= y1;
+  const land = new Path2D();
+  for (const lp of LANDP) {
+    if (lp.x1 < x0 || lp.x0 > x1 || lp.y1 < y0 || lp.y0 > y1) continue;
+    for (const r of lp.rings) { land.moveTo(r[0][0], r[0][1]); for (let i = 1; i < r.length; i++) land.lineTo(r[i][0], r[i][1]); land.closePath(); }
+  }
+  ctx.fillStyle = '#b7a57c'; ctx.fill(land);
+  const fills = new Map(), provP = new Path2D(), borderP = new Path2D(), k = lodFor(z);
+  for (const pv of PROV) {
+    const col = TERR.col[pv.id];
+    if (!col || !vis(pv.bb)) continue;
+    let p = fills.get(col); if (!p) fills.set(col, p = new Path2D());
+    polyPath(p, pv.lod[k]);
+  }
+  for (const e of PROV_EDGES) {
+    if (!vis(e.bb)) continue;
+    if (TERR.keys[e.a] !== TERR.keys[e.b]) linePath(borderP, e.lod[k]); else if (z >= 11) linePath(provP, e.lod[k]);
+  }
   ctx.globalAlpha = 0.78;
-  for (const g of TERR.fills) { ctx.fillStyle = g.col; ctx.fill(g.path); }
+  for (const [col, p] of fills) { ctx.fillStyle = col; ctx.fill(p); }
   ctx.globalAlpha = 1;
-  // İl sınırları (ince) ve krallık sınırları (kalın)
-  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  ctx.lineWidth = Math.max(0.6, Math.min(1.1, z / 30)) * px; ctx.strokeStyle = 'rgba(28,20,12,0.38)'; ctx.stroke(PROVPATH);
-  ctx.lineWidth = 2.4 * px; ctx.strokeStyle = 'rgba(18,12,6,0.92)'; ctx.stroke(TERR.border);
-  ctx.lineWidth = 0.8 * px; ctx.strokeStyle = 'rgba(255,240,205,0.35)'; ctx.stroke(TERR.border);
-  // Seçili il
+  ctx.lineCap = 'butt'; ctx.lineJoin = 'bevel';
+  if (z >= 11) { ctx.lineWidth = Math.max(0.6, Math.min(1.1, z / 30)) * px; ctx.strokeStyle = 'rgba(28,20,12,0.38)'; ctx.stroke(provP); }
+  ctx.lineWidth = 2.4 * px; ctx.strokeStyle = 'rgba(18,12,6,0.92)'; ctx.stroke(borderP);
+  ctx.lineWidth = 0.8 * px; ctx.strokeStyle = 'rgba(255,240,205,0.35)'; ctx.stroke(borderP);
   if (UI.selProv != null && PROV[UI.selProv]) {
-    const sp = new Path2D(); polyPath(sp, PROV[UI.selProv].rough);
+    const sp = new Path2D(); polyPath(sp, PROV[UI.selProv].lod[k]);
     ctx.fillStyle = 'rgba(255,225,140,0.18)'; ctx.fill(sp);
     ctx.lineWidth = 2.2 * px; ctx.strokeStyle = '#ffd76a'; ctx.stroke(sp);
   }
-  ctx.restore();
-  ctx.lineWidth = 1.2 * px; ctx.strokeStyle = 'rgba(14,10,6,0.9)'; ctx.stroke(LANDPATH);
+  // Deniz maskesi: kara dışındaki her şeyi tek seferde örter (kırpmadan çok daha hızlı)
+  const mask = new Path2D();
+  mask.rect(x0 - 1, y0 - 1, x1 - x0 + 2, y1 - y0 + 2);
+  mask.addPath(land);
+  ctx.fillStyle = '#183440'; ctx.fill(mask, 'evenodd');
+  ctx.lineWidth = 3 * px; ctx.strokeStyle = 'rgba(160,200,210,0.10)'; ctx.stroke(land);
+  ctx.lineWidth = 1.3 * px; ctx.strokeStyle = 'rgba(14,10,6,0.9)'; ctx.stroke(land);
+  Object.assign(BASE, { ok: true, z, cx: CAM.x, cy: CAM.y, W, H, d, BW, BH, sel: UI.selProv });
+}
+function invalidateMap() { BASE.ok = false; MAPDIRTY = true; }
+let MAPDIRTY = true, _lastCam = '', _lastDraw = 0;
+/* Bu karede çizmek gerekiyor mu? (boşta iken saniyede ~5 kare yeter) */
+function mapNeedsDraw(time) {
+  const cam = CAM.x.toFixed(4) + ',' + CAM.y.toFixed(4) + ',' + CAM.z.toFixed(3) + ',' + UI.selProv;
+  const busy = G.turnLeft > 0 || cam !== _lastCam || MAPDIRTY || G.terrDirty;
+  if (!busy && time - _lastDraw < 200) return false;
+  _lastCam = cam; _lastDraw = time; MAPDIRTY = false;
+  return true;
+}
+function drawMap(time) {
+  if (!MAPCV || !G) return;
+  const pp = playerParty();
+  if (CAM.follow && pp) {
+    const dx = pp.x - CAM.x, dy = pp.y - CAM.y;
+    if (Math.abs(dx) + Math.abs(dy) < 0.002) { CAM.x = pp.x; CAM.y = pp.y; } else { CAM.x += dx * 0.2; CAM.y += dy * 0.2; }
+  }
+  if (!mapNeedsDraw(time)) return;
+  if (G.terrDirty || !TERR) { buildTerritory(); BASE.ok = false; }
+  const ctx = MCTX, d = MAPCV._d, W = MAPCV.width / d, H = MAPCV.height / d;
+  const z = CAM.z, px = 1 / z;
+  // Taban katmanı geçerli mi? (yakınlaştırma bitince, sınır aşılınca ya da seçim değişince yeniden çiz)
+  if (BASE.z !== z) BASE.zt = time;
+  const sc = BASE.ok ? z / BASE.z : 1;
+  const offX = (BASE.cx - CAM.x) * z, offY = (BASE.cy - CAM.y) * z;
+  const outside = !BASE.ok || Math.abs(offX) > W * BASE_M * 0.95 || Math.abs(offY) > H * BASE_M * 0.95;
+  const zoomStale = BASE.ok && Math.abs(sc - 1) > 0.001 && (time - BASE.zt > 140 || sc < 0.8 || sc > 1.25);
+  const bd = d;
+  if (outside || zoomStale || BASE.W !== W || BASE.H !== H || BASE.d !== bd || BASE.sel !== UI.selProv) renderBase(W, H, bd);
+  ctx.setTransform(d, 0, 0, d, 0, 0);
+  ctx.fillStyle = '#183440'; ctx.fillRect(0, 0, W, H);
+  const s = z / BASE.z;
+  ctx.imageSmoothingEnabled = Math.abs(s - 1) > 0.001;
+  ctx.drawImage(BASE.cv, (BASE.cx - CAM.x) * z - s * BASE.BW / 2 + W / 2, (BASE.cy - CAM.y) * z - s * BASE.BH / 2 + H / 2, BASE.BW * s, BASE.BH * s);
+  ctx.setTransform(d * z, 0, 0, d * z, d * (W / 2 - CAM.x * z), d * (H / 2 - CAM.y * z));
+  const SETTS = settlements();
   // Rota (tur tabanlı)
   const route = pp ? routePreview(pp) : null;
   if (route) {
@@ -165,7 +207,7 @@ function drawMap(time) {
   if (z < 22) {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (const r of realms()) {
-      const ss = realmSettlements(r);
+      const ss = SETTS.filter(s => s.liege === r.id);
       if (!ss.length) continue;
       const cx = ss.reduce((a, s) => a + s.x, 0) / ss.length, cy = ss.reduce((a, s) => a + s.y, 0) / ss.length;
       const [sx, sy] = mapToScreen(cx, cy);
@@ -180,7 +222,7 @@ function drawMap(time) {
   // Yerleşimler
   const showNames = z >= 16;
   const names = [];
-  for (const s of settlements()) {
+  for (const s of SETTS) {
     const [sx, sy] = mapToScreen(s.x, s.y);
     if (sx < -40 || sx > W + 40 || sy < -40 || sy > H + 40) continue;
     const r = s.liege ? G.titles[s.liege] : null;
@@ -210,7 +252,7 @@ function drawMap(time) {
     // Aynı yerdeki ordular ve yerleşim simgeleri üst üste binmesin
     const key = Math.round(pt.x * 8) + ',' + Math.round(pt.y * 8);
     const k = stack.get(key) || 0; stack.set(key, k + 1);
-    const onSett = settlements().some(s => Math.abs(s.x - pt.x) < 0.12 && Math.abs(s.y - pt.y) < 0.12);
+    const onSett = SETTS.some(s => Math.abs(s.x - pt.x) < 0.12 && Math.abs(s.y - pt.y) < 0.12);
     sx += (onSett ? setSize + 9 : 0) + k * 13; sy -= k * 3;
     PARTY_SCREEN.set(pt.id, [sx, sy]);
     const c = ch(pt.owner);
