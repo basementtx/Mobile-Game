@@ -5,7 +5,7 @@
    ========================================================= */
 
 let G = null;
-const SAVE_KEY = 'tac-ve-hancer-v1';
+const SAVE_KEY = 'tac-ve-hancer-v2';
 const AP_MAX = 3;
 const LEVY = [0, 1, 15, 100, 220, 400];
 
@@ -59,20 +59,30 @@ function traitStress(c, map) {
 function stressNote(s) { return s > 0 ? ` (Stres +${s})` : s < 0 ? ` (Stres ${s})` : ''; }
 
 /* ---------- İsimler ---------- */
+function rankNames(c) {
+  const east = CULTURES[c.cul] && CULTURES[c.cul].east;
+  return east ? (c.female ? RANKS_EAST_F : RANKS_EAST_M) : (c.female ? RANKS_F : RANKS_M);
+}
 function rankName(c) {
   if (c.age < 16) return c.female ? 'Kız çocuk' : 'Erkek çocuk';
-  return (c.female ? RANKS_F : RANKS_M)[c.rank];
+  if (c.rank === 5) { const r = ownRealm(c); if (r) return REALMS[r.key] ? REALMS[r.key].u[c.female ? 1 : 0] : r.u[c.female ? 1 : 0]; }
+  return rankNames(c)[c.rank];
 }
 function nm(c) {
   if (!c) return 'Bilinmeyen biri';
-  let pre = '';
-  if (c.age >= 16) {
-    if (c.rank === 2) pre = c.female ? 'Dame ' : 'Sör ';
-    else if (c.rank >= 3) pre = (c.female ? RANKS_F : RANKS_M)[c.rank] + ' ';
-  }
-  return `${pre}${c.name} ${c.dyn}`;
+  if (c.age < 16 || c.rank < 2) return `${c.name} ${c.dyn}`;
+  const r = rankName(c);
+  if (c.rank === 2 && !(CULTURES[c.cul] && CULTURES[c.cul].east)) return `${c.female ? 'Dame' : 'Sör'} ${c.name} ${c.dyn}`;
+  if (r === 'Bey' || r === 'Hatun' || r === 'Sipahi' || r === 'Emir') return `${c.name} ${r} (${c.dyn})`;
+  return `${r} ${c.name} ${c.dyn}`;
 }
-function titleOf(c) { const pt = primaryTitle(c); return pt ? pt.name : rankName(c); }
+function titleOf(c) {
+  const r = ownRealm(c);
+  if (r) return r.name;
+  const ss = settlementsOf(c);
+  if (ss.length) return ss.map(t => t.name).slice(0, 3).join(', ') + (ss.length > 3 ? '…' : '');
+  return rankName(c);
+}
 function dateStr() { return `${MONTHS[G.month]} ${G.year}`; }
 function log(m, k = 'info') {
   G.log.unshift({ d: dateStr(), m, k });
@@ -110,10 +120,12 @@ function inheritTraits(m, f) {
 function makeChar(o = {}) {
   const female = o.female ?? chance(0.5);
   const rank = o.rank ?? 0;
+  const cul = o.cul || 'latin';
+  const C = CULTURES[cul];
   const c = {
-    id: G.nextId++,
-    name: o.name || pick(female ? NAMES_F : NAMES_M),
-    dyn: o.dyn || pick(DYNASTIES),
+    id: G.nextId++, cul,
+    name: o.name || pick(female ? C.f : C.m),
+    dyn: o.dyn || pick(C.d),
     female,
     age: o.age ?? rnd(18, 50),
     alive: true,
@@ -134,23 +146,34 @@ function makeChar(o = {}) {
 }
 
 /* ---------- Unvanlar ---------- */
-function addTitle(name, rank, liege) {
-  const t = { id: 't' + (G.nextTitle++), name, rank, holder: null, liege: liege || null };
+function addTitle(name, rank, liege, extra) {
+  const t = Object.assign({ id: 't' + (G.nextTitle++), name, rank, holder: null, liege: liege || null }, extra || {});
   G.titles[t.id] = t;
   return t;
 }
+const isRealm = t => t && t.kind === 'realm';
+const isSettlement = t => t && (t.kind === 'sehir' || t.kind === 'kale');
+function settlementsOf(c) { return c.titles.map(id => G.titles[id]).filter(isSettlement); }
+function ownRealm(c) { for (const id of c.titles) { const t = G.titles[id]; if (isRealm(t)) return t; } return null; }
+function topLiege(c) { let cur = c, g = 0; while (cur && cur.lordId != null && g++ < 12) { const n = ch(cur.lordId); if (!n || !n.alive) break; cur = n; } return cur; }
+/* Karakterin bağlı olduğu krallık (yoksa null) */
+function realmOf(c) { if (!c) return null; const t = topLiege(c); return t ? ownRealm(t) : null; }
+function realmColor(r) { return r ? r.color : '#8a8070'; }
 function primaryTitle(c) {
   let best = null;
-  for (const id of c.titles) { const t = G.titles[id]; if (!best || t.rank > best.rank) best = t; }
+  for (const id of c.titles) { const t = G.titles[id]; if (!best || t.rank > best.rank || (t.rank === best.rank && t.kind === 'sehir' && best.kind !== 'sehir')) best = t; }
   return best;
 }
+/* Kişinin kendi elinde tutabileceğinden fazla olan şehir/kaleleri (bağışlanabilir) */
+function demesneLimit(c) { return 1 + Math.floor(stat(c, 'yon') / 6) + (ownRealm(c) ? 1 : 0); }
 function spareTitles(c) {
-  const pt = primaryTitle(c);
-  return c.titles.map(id => G.titles[id]).filter(t => t !== pt).sort((a, b) => a.rank - b.rank);
+  const ss = settlementsOf(c).sort((a, b) => (a.capital ? 1 : 0) - (b.capital ? 1 : 0) || (a.kind === 'kale' ? -1 : 1));
+  return ss.slice(0, Math.max(0, ss.length - demesneLimit(c)));
 }
 function recalcRank(c) {
-  const pt = primaryTitle(c);
-  c.rank = pt ? pt.rank : c.baseRank;
+  if (ownRealm(c)) { c.rank = 5; return; }
+  const n = settlementsOf(c).length;
+  c.rank = n >= 3 ? 4 : n >= 1 ? 3 : c.baseRank;
 }
 function giveTitle(t, c) {
   if (t.holder != null) {
@@ -342,7 +365,7 @@ function die(c, reason) {
     if (x.lordId === c.id && !x.titles.length) x.lordId = heir ? heir.id : c.lordId;
     if (x.prisonerOf === c.id) x.prisonerOf = heir && heir.id !== x.id ? heir.id : null;
   }
-  for (const w of G.wars.slice()) if (w.att === c.id || w.def === c.id) endWar(w, 'beyaz');
+  if (typeof onCharGone === 'function') onCharGone(c, heir);
   refreshLieges();
   if (!wasPlayer && relevant(c)) log(`✝️ ${nm(c)} öldü — ${reason}. (${c.age} yaşında)`, 'death');
   if (wasPlayer) {
@@ -361,7 +384,7 @@ function relevant(...cs) {
   const p = P();
   if (!p) return false;
   return cs.some(c => c && (c.id === p.id || familyRel(p, c) || c.id === p.lordId || c.lordId === p.id ||
-    p.lovers.includes(c.id) || c.rank >= 4 || Math.abs(opinion(p, c)) >= 40));
+    p.lovers.includes(c.id) || (c.rank >= 5 && realmOf(p) === ownRealm(c)) || Math.abs(opinion(p, c)) >= 50));
 }
 
 /* ---------- Hapis / İdam ---------- */
@@ -372,7 +395,7 @@ function imprison(captor, c, just) {
     captor.tyranny += 15;
     captor.dread += 8;
   }
-  for (const w of G.wars.slice()) if (w.att === c.id || w.def === c.id) endWar(w, w.att === c.id ? 'def' : 'att');
+  if (typeof onCharGone === 'function') onCharGone(c, null);
 }
 function execute(captor, c) {
   const just = hasKnownCrime(captor, c) || G.secrets.some(s => s.actor === c.id && s.pub && SECRETS[s.type].suc);
@@ -387,107 +410,13 @@ function execute(captor, c) {
 function income(c) {
   if (c.age < 16 || c.prisonerOf) return 0;
   const y = stat(c, 'yon');
-  return [1, 2, 4, 6 + Math.floor(y / 2), 15 + y, 30 + y * 2][c.rank];
+  let g = [1, 2, 4, 0, 0, 0][Math.min(c.rank, 5)];
+  for (const t of settlementsOf(c)) g += (t.kind === 'sehir' ? 14 : 8) * (t.prosperity || 1) + Math.floor(y / 3);
+  const r = ownRealm(c);
+  if (r) g += 3 * Object.values(G.titles).filter(t => isSettlement(t) && t.liege === r.id && t.holder !== c.id).length;
+  return Math.round(g);
 }
-function ownMen(c) {
-  if (!free(c) || c.age < 16) return 0;
-  return LEVY[c.rank] + (c.rank >= 3 ? stat(c, 'yon') * 5 : 0);
-}
-function armyOf(c, enemyId, depth = 0) {
-  if (!free(c) || depth > 6) return 0;
-  let men = ownMen(c);
-  for (const v of living()) {
-    if (v.lordId !== c.id || v.id === enemyId || v.prisonerOf) continue;
-    const o = opinion(v, c) + c.dread / 3;
-    if (o >= -15) men += armyOf(v, enemyId, depth + 1);
-  }
-  return men;
-}
-function atWar(c) { return G.wars.some(w => w.att === c.id || w.def === c.id); }
-function warOf(c) { return G.wars.find(w => w.att === c.id || w.def === c.id) || null; }
-
 /* ---------- Savaş ---------- */
-function startWar(att, def, goal) {
-  const pt = primaryTitle(def);
-  const w = { id: G.nextWar++, att: att.id, def: def.id, goal, titleId: pt ? pt.id : null, score: 0, merc: {}, months: 0 };
-  G.wars.push(w);
-  const label = goal === 'bagimsizlik' ? 'bağımsızlık' : `${pt ? pt.name : 'unvan'} için`;
-  if (relevant(att, def)) log(`⚔️ ${nm(att)}, ${nm(def)} hükümdarına ${label} savaş açtı!`, 'war');
-  if (def.id === G.playerId) info('⚔️ Savaş!', `<b>${nm(att)}</b> sana ${label} savaş ilan etti!<br>Ordusu: ~${armyOf(att, def.id)} asker. Senin ordun: ~${armyOf(def, att.id)} asker.<br><br>Paralı asker tutarak savunmanı güçlendirebilirsin.`);
-  return w;
-}
-function warPower(w, side) {
-  const c = ch(side === 'att' ? w.att : w.def);
-  const other = side === 'att' ? w.def : w.att;
-  const men = armyOf(c, other) + (w.merc[c.id] || 0);
-  return { men, power: men * (1 + stat(c, 'sav') / 20) };
-}
-function warTick(w) {
-  const a = ch(w.att), d = ch(w.def);
-  if (!a || !d || !a.alive || !d.alive) { endWar(w, 'beyaz'); return; }
-  const pa = warPower(w, 'att').power * rnd(70, 130) / 100;
-  const pd = warPower(w, 'def').power * rnd(70, 130) / 100 * 1.1;
-  const delta = Math.round(((pa - pd) / (pa + pd + 1)) * 50);
-  w.score = clamp(w.score + delta, -100, 100);
-  w.months++;
-  for (const k in w.merc) w.merc[k] = Math.floor(w.merc[k] * 0.9);
-  const p = P();
-  if (w.att === p.id || w.def === p.id) {
-    const weWon = (w.att === p.id) === (delta > 0);
-    log(`⚔️ Muharebe: ${weWon ? 'Senin ordun galip geldi' : 'Ordun bozguna uğradı'}. Savaş skoru: ${w.att === p.id ? w.score : -w.score}`, weWon ? 'good' : 'bad');
-    if (chance(0.06)) {
-      p.health -= rnd(15, 35);
-      addTrait(p, 'yarali');
-      log('🩸 Savaşta ağır yaralandın!', 'bad');
-      if (p.health <= 0) { die(p, 'Savaş meydanında aldığı yaralar'); return; }
-    }
-  } else if (chance(0.02)) {
-    const victim = chance(0.5) ? a : d;
-    if (victim.id !== G.playerId) { die(victim, 'Savaş meydanında düştü'); return; }
-  }
-  if (w.score >= 100) endWar(w, 'att');
-  else if (w.score <= -100) endWar(w, 'def');
-  else if (w.months >= 24) endWar(w, 'beyaz');
-}
-function endWar(w, winner) {
-  if (!G.wars.includes(w)) return;
-  G.wars = G.wars.filter(x => x !== w);
-  const a = ch(w.att), d = ch(w.def), p = P();
-  let msg = '';
-  if (winner === 'att' && a && a.alive) {
-    if (w.goal === 'gasp') {
-      const t = G.titles[w.titleId];
-      if (t && d && t.holder === d.id) giveTitle(t, a);
-      a.prestige += 100;
-      msg = `${nm(a)} savaşı kazandı ve ${t ? t.name : 'unvanı'} ele geçirdi!`;
-      if (d && d.alive && chance(0.5)) { imprison(a, d, true); msg += ` ${d.name} zindana atıldı.`; }
-    } else {
-      const pt = primaryTitle(a);
-      if (pt) {
-        if (pt.rank < 5) {
-          const nt = addTitle(`${a.dyn} ${pt.rank === 4 ? 'Krallığı' : 'Dükalığı'}`, pt.rank + 1, null);
-          pt.liege = nt.id;
-          giveTitle(nt, a);
-        } else pt.liege = null;
-      }
-      refreshLieges();
-      a.prestige += 150;
-      msg = `${nm(a)} bağımsızlığını kazandı ve ${titleOf(a)} kuruldu!`;
-    }
-  } else if (winner === 'def' && a && d) {
-    const pay = Math.floor(a.gold / 2);
-    a.gold -= pay; d.gold += pay;
-    a.prestige -= 50; d.prestige += 50;
-    msg = `${nm(d)} savaşı kazandı. ${nm(a)} ${pay} altın tazminat ödedi.`;
-    if (a.alive && d.alive && chance(0.4)) { imprison(d, a, true); msg += ` ${a.name} zindana atıldı.`; }
-  } else {
-    msg = `${a ? nm(a) : '?'} ile ${d ? nm(d) : '?'} arasındaki savaş sonuçsuz bitti.`;
-  }
-  refreshLieges();
-  if (p && (w.att === p.id || w.def === p.id)) { log(`🏳️ ${msg}`, 'war'); if (p.alive) info('🏳️ Savaş bitti', msg); }
-  else if (relevant(a, d)) log(`🏳️ ${msg}`, 'war');
-}
-
 /* ---------- Ortak etkileşim sonuçları (oyuncu ve NPC aynı kurallar) ---------- */
 function seduceChance(a, b) {
   return clamp(Math.round(20 + (stat(a, 'cek') - 5) * 6 + opinion(b, a) / 2 + (has(b, 'sehvetli') ? 20 : 0) -
@@ -564,7 +493,7 @@ function spy(a, b) {
 function birth(mother, father) {
   const legit = mother.spouseId ? ch(mother.spouseId) : null;
   const kid = makeChar({
-    age: 0, traits: inheritTraits(mother, father), gold: 0,
+    age: 0, traits: inheritTraits(mother, father), gold: 0, cul: (legit || mother).cul,
     base: Object.fromEntries(Object.keys(STATS).map(k => [k, clamp(Math.round((mother.base[k] + father.base[k]) / 2) + rnd(-2, 2), 1, 14)])),
   });
   kid.motherId = mother.id;
@@ -748,20 +677,6 @@ function playerAssassinAttempt(c) {
 }
 
 /* ---------- Aylık işleyiş ---------- */
-function npcWars() {
-  for (const c of living()) {
-    if (c.id === G.playerId || !free(c) || c.rank < 3 || c.lordId == null || atWar(c)) continue;
-    const l = ch(c.lordId);
-    if (!free(l) || atWar(l)) continue;
-    const o = opinion(c, l);
-    if (o > -40 || !(has(c, 'hirsli') || has(c, 'kibirli')) || l.dread > 40) continue;
-    if (!chance(0.03)) continue;
-    const pa = armyOf(c, l.id), pd = armyOf(l, c.id);
-    if (pa < pd * 0.7) continue;
-    const goal = c.rank === l.rank - 1 && has(c, 'hirsli') ? 'gasp' : 'bagimsizlik';
-    startWar(c, l, goal);
-  }
-}
 function prisonsTick() {
   const p = P();
   for (const x of living()) {
@@ -843,6 +758,7 @@ function grantTick() {
 }
 function fillVacant() {
   for (const t of Object.values(G.titles)) {
+    if (t.dead) continue;
     if (t.holder != null && ch(t.holder) && ch(t.holder).alive) continue;
     const lt = t.liege ? G.titles[t.liege] : null;
     const lh = lt && lt.holder != null ? ch(lt.holder) : null;
@@ -894,21 +810,21 @@ function decayTick() {
 }
 function populationTick() {
   const all = living();
-  if (all.length > 170) {
+  if (all.length > 420) {
     const p = P();
     const movers = all.filter(c => c.id !== p.id && isAdult(c) && c.rank <= 1 && !c.titles.length && !c.prisonerOf &&
       !relevant(c) && !all.some(x => x.lordId === c.id));
-    for (const c of shuffle(movers).slice(0, Math.min(4, all.length - 170))) die(c, 'Diyardan göç etti');
+    for (const c of shuffle(movers).slice(0, Math.min(6, all.length - 420))) die(c, 'Diyardan göç etti');
   }
   pruneTick();
   const adults = living().filter(isAdult).length;
-  if (adults >= 60) return;
+  if (adults >= 230) return;
   const lords = living().filter(x => x.rank >= 3);
-  const n = adults < 45 ? 2 : 1;
+  const n = adults < 180 ? 3 : 1;
   for (let i = 0; i < n; i++) {
     const r = weighted([[0, 4], [1, 3], [2, 2]]);
     const lord = lords.length ? pick(lords) : null;
-    makeChar({ rank: r, age: rnd(16, 35), gold: rnd(2, 15) + r * 10, prestige: r * 20, lordId: lord ? lord.id : null });
+    makeChar({ rank: r, age: rnd(16, 35), gold: rnd(2, 15) + r * 10, prestige: r * 20, lordId: lord ? lord.id : null, cul: lord ? lord.cul : 'latin' });
   }
 }
 /* Eski ölüleri ve bayat sırları temizle (kayıt dosyası şişmesin) */
@@ -944,13 +860,11 @@ function randomEventTick() {
   if (d) queueEvent(id, d);
 }
 
-function endMonth() {
+/* Ay sonu: entrika dünyası (gelir/maaş ve savaşlar world.js'te) */
+function monthTick() {
   if (G.over) return;
   const all = living();
-  for (const c of all) c.gold += income(c);
-  for (const c of shuffle(all.slice())) if (c.alive && c.id !== G.playerId && chance(0.14)) npcAct(c);
-  for (const w of G.wars.slice()) if (G.wars.includes(w)) warTick(w);
-  npcWars();
+  for (const c of shuffle(all.slice())) if (c.alive && c.id !== G.playerId && chance(0.12)) npcAct(c);
   prisonsTick();
   secretsTick();
   grantTick();
@@ -959,105 +873,12 @@ function endMonth() {
   fillVacant();
   decayTick();
   populationTick();
-  G.month++;
-  if (G.month >= 12) { G.month = 0; G.year++; for (const c of living()) c.age++; }
   G.ap = AP_MAX;
   G.monthsPlayed++;
   if (!G.over) randomEventTick();
-  saveGame();
 }
 
 /* ---------- Yeni oyun ---------- */
-function newWorld(opt) {
-  G = {
-    year: 1180, month: 2, chars: {}, titles: {}, secrets: [], wars: [], log: [], queue: [],
-    nextId: 1, nextTitle: 1, nextSecret: 1, nextWar: 1, playerId: null, ap: AP_MAX,
-    over: null, monthsPlayed: 0, generation: 1, founder: `${opt.name} ${opt.dyn}`,
-  };
-  const knights = (lord, n) => {
-    for (let i = 0; i < n; i++) {
-      const k = makeChar({ rank: 2, age: rnd(18, 45), gold: rnd(15, 35), prestige: rnd(20, 70), lordId: lord.id });
-      if (chance(0.4)) family(k, 2);
-    }
-  };
-  const family = (head, kidsMax) => {
-    if (chance(0.75) && head.age >= 18) {
-      const sp = makeChar({ female: !head.female, age: clamp(head.age + rnd(-8, 4), 17, 75), rank: Math.min(2, Math.max(0, head.rank - 1)), gold: 5, lordId: head.titles.length ? head.id : head.lordId });
-      marry(head, sp);
-      const youngest = Math.min(head.age, sp.age);
-      const n = rnd(0, kidsMax);
-      for (let i = 0; i < n && youngest > 18; i++) {
-        const mother = head.female ? head : sp, father = head.female ? sp : head;
-        const kid = makeChar({ age: rnd(0, Math.min(youngest - 17, 30)), dyn: head.dyn, gold: 0, traits: inheritTraits(mother, father), rank: head.rank >= 2 ? 2 : 0, lordId: head.titles.length ? head.id : head.lordId });
-        kid.fatherId = father.id; kid.motherId = mother.id;
-        father.children.push(kid.id); mother.children.push(kid.id);
-      }
-    }
-  };
-  const ruler = (rank, title, skip) => {
-    if (skip) return null;
-    const c = makeChar({ rank, age: rnd(28, 60), gold: [0, 0, 0, 60, 150, 300][rank], prestige: rank * 60 + rnd(0, 80) });
-    giveTitle(title, c);
-    family(c, 3);
-    return c;
-  };
-  const K = addTitle(PLACES.krallik, 5, null);
-  const king = ruler(5, K);
-  knights(king, 3);
-  let homeBarony = null, homeLord = null;
-  PLACES.dukaliklar.forEach(([dn, bns], di) => {
-    const D = addTitle(dn, 4, K.id);
-    const duke = ruler(4, D);
-    knights(duke, 2);
-    bns.forEach((bn, bi) => {
-      const B = addTitle(bn, 3, D.id);
-      const isHome = di === 0 && bi === 0;
-      const baron = ruler(3, B, isHome && opt.start === 'lord');
-      if (isHome) { homeBarony = B; homeLord = baron; }
-      if (!baron) return;
-      knights(baron, 2);
-      makeChar({ rank: 1, age: rnd(17, 35), gold: rnd(3, 10), lordId: baron.id });
-      for (let i = 0; i < 2; i++) makeChar({ rank: 0, age: rnd(16, 50), gold: rnd(1, 6), lordId: baron.id });
-    });
-  });
-
-  const startCfg = {
-    koylu: { rank: 0, age: 18, gold: 10, prestige: 0 },
-    sovalye: { rank: 2, age: 22, gold: 40, prestige: 60 },
-    lord: { rank: 3, age: 25, gold: 100, prestige: 150 },
-  }[opt.start];
-  const p = makeChar({ name: opt.name, dyn: opt.dyn, female: opt.female, age: startCfg.age, rank: startCfg.rank, gold: startCfg.gold, prestige: startCfg.prestige, traits: opt.traits.slice(), base: { ...opt.base } });
-  G.playerId = p.id;
-  if (opt.start === 'lord') {
-    giveTitle(homeBarony, p);
-    knights(p, 2);
-    makeChar({ rank: 1, age: rnd(17, 35), gold: rnd(3, 10), lordId: p.id });
-    for (let i = 0; i < 2; i++) makeChar({ rank: 0, age: rnd(16, 50), gold: rnd(1, 6), lordId: p.id });
-  } else {
-    p.lordId = homeLord.id;
-  }
-  refreshLieges();
-  // Başlangıç ilişkileri ve birkaç sır
-  for (const c of living()) {
-    if (chance(0.15) && isAdult(c)) {
-      const others = nearby(c).filter(x => x.id !== p.id && !closeKin(c, x));
-      if (others.length) {
-        const o = pick(others);
-        if (chance(0.5) && o.female !== c.female) becomeLovers(c, o);
-        else addOp(c, o, rnd(-60, 60));
-      }
-    }
-  }
-  const startText = {
-    koylu: `${PLACES.krallik}'nın ${homeBarony.name.replace(' Baronluğu', '')} topraklarında, çamurlu bir köyde doğdun. Adın yok, şanın yok, sadece hırsın var.`,
-    sovalye: `${nm(homeLord)} hizmetinde yemin etmiş genç bir şövalyesin. Kılıcın keskin, kesen boş.`,
-    lord: `Babandan kalan ${homeBarony.name}'nun yeni efendisisin. Vasalların seni tartıyor, düşmanların seni izliyor.`,
-  }[opt.start];
-  log(`📜 Hikâye başlıyor. ${startText}`, 'info');
-  info('📜 Taç ve Hançer', `${startText}<br><br>Her ay <b>${AP_MAX} eylem hakkın</b> var. <b>Kişiler</b> sekmesinden insanlarla etkileşime gir, <b>Eylemler</b> sekmesinden kendi işlerini yap, sonra <b>Ayı Bitir</b>.<br><br>Ölürsen varisinle devam edersin. Varisin yoksa hanedanın biter.`);
-  saveGame();
-}
-
 /* ---------- Kayıt ---------- */
 function saveGame() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) { /* kayıt yapılamadı */ }

@@ -275,8 +275,10 @@ const ACTIONS = [
       if (target === 'asker') { p.baseRank = 1; recalcRank(p); return `${nm(t)} seni ordusuna aldı. Artık bir <b>asker</b>sin!`; }
       if (target === 'sovalye') { p.baseRank = 2; recalcRank(p); p.prestige += 30; return `${nm(t)} kılıcını omzuna dokundurdu. Diz çöktün, <b>şövalye</b> olarak kalktın! (Şan +30)`; }
       giveTitle(target, p);
+      refreshLieges();
       p.prestige += 50;
-      return `${nm(t)} sana <b>${target.name}</b> unvanını bağışladı! Artık bir ${rankName(p)}sin. (Şan +50)`;
+      G.terrDirty = true;
+      return `${nm(t)} sana <b>${target.name}</b> topraklarını bağışladı! Artık bir ${rankName(p)}sin. (Şan +50)`;
     },
   },
   {
@@ -294,15 +296,19 @@ const ACTIONS = [
     },
   },
   {
-    id: 'unvanver', ad: 'Unvan bağışla', icon: '🎖️', ap: 1, tgt: true,
-    show: (p, t) => spareTitles(p).length > 0 && !t.titles.length && isAdult(t) && t.id !== p.id && (t.lordId === p.id || familyRel(p, t)),
+    id: 'unvanver', ad: (p) => `Toprak bağışla: ${grantable(p) ? grantable(p).name : ''}`, icon: '🎖️', ap: 1, tgt: true,
+    show: (p, t) => !!grantable(p) && !t.titles.length && isAdult(t) && t.id !== p.id && (t.lordId === p.id || familyRel(p, t)),
     req: (p, t) => firstReq(jailReq(p, t), t.prisonerOf ? 'Zindanda' : null),
     run(p, t) {
-      const tt = spareTitles(p)[0];
+      const tt = grantable(p);
       giveTitle(tt, t);
+      const r = ownRealm(p) || realmOf(p);
+      tt.liege = r ? r.id : tt.liege;
+      refreshLieges();
       addOp(t, p, 40);
       t.prestige += 50;
-      return `<b>${tt.name}</b> unvanını ${nm(t)} adlı kişiye bağışladın. Artık senin vasalın ve sana minnettar. (+40 ilişki)`;
+      G.terrDirty = true;
+      return `<b>${tt.name}</b> topraklarını ${nm(t)} adlı kişiye bağışladın. Artık senin vasalın ve sana minnettar. (+40 ilişki)`;
     },
   },
   {
@@ -326,15 +332,15 @@ const ACTIONS = [
     req: (p) => jailReq(p),
     run(p, t) {
       const just = hasKnownCrime(p, t);
-      if (t.rank >= 3 && !just && armyOf(t, p.id) > armyOf(p, t.id) * 0.5 && chance(0.5)) {
+      if (settlementsOf(t).length && !just && charPower(t) > charPower(p) * 0.4 && chance(0.5)) {
         addOp(t, p, -50);
-        startWar(t, p, 'bagimsizlik');
-        return `${nm(t)} muhafızlarını kılıçla karşıladı ve <b>isyan etti!</b> Artık savaştasınız.`;
+        rebel(t);
+        return `${nm(t)} muhafızlarını kılıçla karşıladı ve <b>isyan etti!</b> Kendi devletini ilan etti, artık savaştasınız.`;
       }
       imprison(p, t, just);
       const st = traitStress(p, just ? { zalim: -5 } : { durust: 10, merhametli: 10, zalim: -5 });
       if (!just) for (const x of living()) if (x.lordId === p.id && x.id !== t.id) addOp(x, p, -5);
-      return `${nm(t)} zincire vuruldu ve zindana atıldı.${just ? ' Suçları biliniyor; kimse itiraz etmedi.' : ' <b>Hiçbir gerekçe yok</b> — vasalların tedirgin. (Zorbalık +15, Korku +8)'}${stressNote(st)}`;
+      return `${nm(t)} zincire vuruldu ve zindana atıldı.${just ? ' Suçları biliniyor; kimse itiraz etmedi.' : ' <b>Hiçbir gerekçe yok</b>. Vasalların tedirgin. (Zorbalık +15, Korku +8)'}${stressNote(st)}`;
     },
   },
   {
@@ -388,27 +394,47 @@ const ACTIONS = [
     },
   },
   {
-    id: 'elkoy', ad: 'Unvanlarına el koy', icon: '🏴', ap: 1, tgt: true,
-    show: (p, t) => playerCaptive(p, t) && t.titles.some(id => { const tt = G.titles[id]; return tt.liege && p.titles.includes(tt.liege); }),
+    id: 'elkoy', ad: 'Topraklarına el koy', icon: '🏴', ap: 1, tgt: true,
+    show: (p, t) => playerCaptive(p, t) && settlementsOf(t).length > 0 && (isUnder(t, p) || hostileChars(p, t)),
     req: () => null,
     run(p, t) {
-      const just = hasKnownCrime(p, t);
-      const taken = t.titles.map(id => G.titles[id]).filter(tt => tt.liege && p.titles.includes(tt.liege));
-      taken.forEach(tt => giveTitle(tt, p));
+      const just = hasKnownCrime(p, t) || hostileChars(p, t);
+      const taken = settlementsOf(t);
+      const r = ownRealm(p) || realmOf(p);
+      const oldR = realmOf(t);
+      taken.forEach(tt => { giveTitle(tt, p); tt.liege = r ? r.id : null; });
+      refreshLieges();
+      if (oldR && oldR !== r) checkRealmDeath(oldR);
+      G.terrDirty = true;
       addOp(t, p, -50);
       if (!just) { p.tyranny += 20; for (const x of living()) if (x.lordId === p.id) addOp(x, p, -10); }
       return `${taken.map(x => x.name).join(', ')} artık senin. ${just ? '' : '<b>Vasalların bu zorbalığı unutmayacak.</b> (Zorbalık +20)'}`;
     },
   },
   {
-    id: 'savas', ad: (p, t) => `Savaş aç: ${t && primaryTitle(t) ? primaryTitle(t).name : ''}`, icon: '⚔️', ap: 1, tgt: true,
-    confirm: t => `${nm(t)} hükümdarına savaş açıp unvanını gasp etmeye çalışacaksın. Kaybedersen servetinin yarısını ve belki özgürlüğünü kaybedersin.`,
-    show: (p, t) => t.titles.length > 0 && t.id !== p.id && p.rank >= 2 && isAdult(p) && !isUnder(t, p) && t.rank <= p.rank + 1,
-    req: (p, t) => firstReq(jailReq(p, t), atWar(p) ? 'Zaten savaştasın' : null, atWar(t) ? 'O zaten savaşta' : null),
-    info: (p, t) => `Ordun ~${armyOf(p, t.id)} · Onun ~${armyOf(t, p.id)}`,
+    id: 'savas', ad: (p, t) => `Savaş ilan et: ${t && ownRealm(t) ? ownRealm(t).name : ''}`, icon: '⚔️', ap: 1, tgt: true,
+    confirm: t => `${ownRealm(t).name} ile savaşa gireceksin. Orduları senin topraklarına yürüyecek.`,
+    show: (p, t) => !!ownRealm(p) && !!ownRealm(t) && ownRealm(p) !== ownRealm(t) && !atWarRealms(ownRealm(p), ownRealm(t)),
+    req: (p, t) => jailReq(p, t),
+    info: (p, t) => `Gücün ~${Math.round(charPower(p))} · Onun ~${Math.round(charPower(t))}`,
     run(p, t) {
-      startWar(p, t, 'gasp');
-      return `Savaş borazanları çaldı! ${primaryTitle(t).name} için savaş başladı. Ordun ~${armyOf(p, t.id)}, onunki ~${armyOf(t, p.id)} asker. Paralı asker tutarak güçlenebilirsin.`;
+      declareWar(ownRealm(p), ownRealm(t));
+      addOp(t, p, -40);
+      return `Savaş borazanları çaldı! ${ownRealm(t).name} ile savaştasın. Şehirlerini kuşat, ordularını ez.`;
+    },
+  },
+  {
+    id: 'baris', ad: 'Barış teklif et', icon: '🕊️', ap: 1, tgt: true,
+    show: (p, t) => !!ownRealm(p) && !!ownRealm(t) && atWarRealms(ownRealm(p), ownRealm(t)),
+    req: (p, t) => jailReq(p, t),
+    chance: (p, t) => {
+      const w = G.wars.find(w => [w.a, w.b].includes(ownRealm(p).id) && [w.a, w.b].includes(ownRealm(t).id));
+      const bal = w ? (w.taken[ownRealm(p).id] || 0) - (w.taken[ownRealm(t).id] || 0) : 0;
+      return pct(25 + bal * 15 + opinion(t, p) / 3 + (charPower(p) / Math.max(1, charPower(t)) - 1) * 20 + (w ? (G.day - w.start) / 30 * 2 : 0));
+    },
+    run(p, t) {
+      if (chance(this.chance(p, t) / 100)) { makePeace(ownRealm(p), ownRealm(t)); return `${nm(t)} barışı kabul etti. Kılıçlar kınına girdi.`; }
+      return `${nm(t)} teklifini küçümsedi: "Savaş bitmedi!"`;
     },
   },
 
@@ -531,7 +557,7 @@ const ACTIONS = [
       let m = `Bir gece boyunca içtin, güldün, şarkı söyledin.${stressNote(st)}`;
       if (chance(0.08)) { addTrait(p, 'ayyas'); m += ' Ama bu alışkanlık haline geliyor... (<b>Ayyaş</b>)'; }
       if (chance(0.3)) {
-        const n = makeChar({ female: chance(0.85) ? !p.female : p.female, age: rnd(17, 35), rank: rnd(0, 1), lordId: p.lordId, gold: rnd(1, 8) });
+        const n = makeChar({ female: chance(0.85) ? !p.female : p.female, age: rnd(17, 35), rank: rnd(0, 1), lordId: p.lordId, gold: rnd(1, 8), cul: localCulture() });
         addOp(n, p, rnd(20, 40));
         m += `<br>Bu gece <b>${nm(n)}</b> ile tanıştın. Sana ilgiyle bakıyordu.`;
       }
@@ -562,25 +588,35 @@ const ACTIONS = [
   },
   {
     id: 'bagimsizlik', ad: 'Bağımsızlık ilan et', icon: '🏴', ap: 1,
-    confirm: () => 'Efendine karşı bağımsızlık savaşı başlatacaksın. Kazanırsan kendi krallığını/dükalığını kurarsın.',
-    show: p => p.rank >= 3 && p.lordId != null,
-    req: p => firstReq(jailReq(p), atWar(p) ? 'Zaten savaştasın' : null),
-    info: p => { const l = ch(p.lordId); return l ? `Ordun ~${armyOf(p, l.id)} · Efendinin ~${armyOf(l, p.id)}` : ''; },
+    confirm: () => 'Efendine karşı isyan edip kendi devletini kuracaksın. Eski krallığın sana savaş açacak.',
+    show: p => settlementsOf(p).length > 0 && p.lordId != null && !ownRealm(p),
+    req: p => jailReq(p),
+    info: p => { const l = ch(p.lordId); return l ? `Gücün ~${Math.round(charPower(p))} · Efendinin ~${Math.round(charPower(topLiege(p)))}` : ''; },
     run(p) {
-      const l = ch(p.lordId);
-      startWar(p, l, 'bagimsizlik');
-      return `${nm(l)} hükümdarına karşı bağımsızlık ilan ettin! Bayrağın kalelerin üzerinde dalgalanıyor.`;
+      const r = rebel(p);
+      return `İsyan bayrağını kaldırdın! <b>${r.name}</b> kuruldu. Artık kendi devletinin hükümdarısın ve eski efendinle savaştasın.`;
     },
   },
   {
-    id: 'parali', ad: 'Paralı asker tut (50💰)', icon: '🪖', ap: 1,
-    show: p => atWar(p),
-    req: p => firstReq(jailReq(p), goldReq(p, 50)),
+    id: 'kralliginikur', ad: 'Krallığını ilan et (300 şan)', icon: '👑', ap: 1,
+    show: p => settlementsOf(p).length > 0 && p.lordId == null && !ownRealm(p),
+    req: p => firstReq(jailReq(p), settlementsOf(p).length < 2 ? 'En az 2 şehir/kale gerekli' : null, p.prestige < 300 ? '300 şan gerekli' : null),
     run(p) {
-      const w = warOf(p);
-      p.gold -= 50;
-      w.merc[p.id] = (w.merc[p.id] || 0) + 60;
-      return `60 paralı asker sancağının altına geçti. (Her ay %10 kayıp verirler.)`;
+      p.prestige -= 300;
+      const r = createRealm(p);
+      return `Taç başına kondu! <b>${r.name}</b> kuruldu ve sen onun ilk hükümdarısın. 👑`;
+    },
+  },
+  {
+    id: 'parali', ad: 'Paralı asker kirala (150💰)', icon: '🪖', ap: 1,
+    show: p => !!playerParty(),
+    req: p => firstReq(jailReq(p), goldReq(p, 150)),
+    run(p) {
+      const pt = playerParty();
+      p.gold -= 150;
+      const add = CULTURES[localCulture()].east ? { piyade: 12, atliokcu: 10 } : { piyade: 14, okcu: 8, atli: 4 };
+      for (const k in add) pt.troops[k] = (pt.troops[k] || 0) + add[k];
+      return `Paralı bir bölük sancağının altına geçti: ${lossText(add)}.`;
     },
   },
   {
@@ -619,6 +655,10 @@ const ACTIONS = [
 ];
 const ACTION_MAP = Object.fromEntries(ACTIONS.map(a => [a.id, a]));
 
+function grantable(p) {
+  const ss = settlementsOf(p).filter(x => !x.capital).sort((a, b) => (a.kind === 'kale' ? -1 : 1));
+  return settlementsOf(p).length >= 2 ? ss[0] || null : null;
+}
 function feastCost(p) { return [0, 0, 20, 40, 80, 120][p.rank]; }
 /* Terfi hedefi: 'asker' | 'sovalye' | unvan nesnesi | null (boş unvan yok) | undefined (uygun değil) */
 function promoTarget(p, t) {
@@ -626,19 +666,17 @@ function promoTarget(p, t) {
   if (!p.titles.length) {
     if (p.baseRank === 0) return 'asker';
     if (p.baseRank === 1) return 'sovalye';
-    if (t.rank <= 3) return undefined;
-    return spareTitles(t).find(x => x.rank === 3) || null;
   }
-  if (p.rank + 1 >= t.rank) return undefined;
-  return spareTitles(t).find(x => x.rank === p.rank + 1) || null;
+  if (!settlementsOf(t).length) return undefined;
+  return spareTitles(t)[0] || null;
 }
 function promoLabel(p) {
   if (!p.titles.length) {
     if (p.baseRank === 0) return 'Askere yazılmak iste';
-    if (p.baseRank === 1) return 'Şövalyelik iste';
-    return 'Toprak (baronluk) iste';
+    if (p.baseRank === 1) return (CULTURES[p.cul] && CULTURES[p.cul].east) ? 'Sipahilik iste' : 'Şövalyelik iste';
+    return 'Toprak (tımar) iste';
   }
-  return 'Daha yüksek unvan iste';
+  return 'Ek toprak iste';
 }
 function promoChance(p, t) {
   const target = promoTarget(p, t);

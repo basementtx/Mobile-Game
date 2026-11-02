@@ -4,22 +4,51 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <title>Taç ve Hançer</title>
-  <meta name="description" content="Ortaçağda entrika, ihanet, aşk ve iktidar. Köylüden krala.">
-  <meta name="theme-color" content="#16110d">
+  <meta name="description" content="1180 yılında, gerçek dünya haritasında entrika, savaş ve hanedan oyunu.">
+  <meta name="theme-color" content="#14100c">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Alegreya:ital,wght@0,400;0,600;1,400&display=swap">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div id="app"></div>
+  <!-- @@BODY -->
+  <div id="setup" class="screen"></div>
+  <div id="game" class="screen hidden">
+    <canvas id="mapcv"></canvas>
+    <div id="hudL" class="hud"></div>
+    <div id="hudR" class="hud"></div>
+    <div id="status" class="hidden"></div>
+    <nav id="tools"></nav>
+    <div id="joy" class="joy"><div class="knob"></div></div>
+    <div id="ctxbar"></div>
+    <div id="popup" class="hidden"></div>
+    <aside id="drawer" class="hidden"><header><span class="dtitle"></span><button class="dx" aria-label="Kapat">✕</button></header><div class="dbody"></div></aside>
+  </div>
+  <div id="battle" class="screen hidden">
+    <canvas id="bcv"></canvas>
+    <div id="btop"></div>
+    <div id="bmsg" class="hidden"></div>
+    <div id="bjoy" class="joy"><div class="knob"></div></div>
+    <div id="border"></div>
+  </div>
   <div id="modal" class="hidden"></div>
+  <div id="rotate" class="hidden"><div><div class="rot">📱↻</div><h2>Telefonu yan çevir</h2><p>Taç ve Hançer yatay ekranda oynanır.</p><button class="ghost">Yine de dikey devam et</button></div></div>
+  <!-- @@END -->
   <script src="js/data.js"></script>
+  <script src="js/geo.js"></script>
   <script src="js/engine.js"></script>
+  <script src="js/world.js"></script>
   <script src="js/actions.js"></script>
   <script src="js/events.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/battle.js"></script>
   <script src="js/ui.js"></script>
 </body>
 </html>

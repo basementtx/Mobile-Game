@@ -99,6 +99,20 @@ const EVENTS = {
     ],
   },
 
+  barisTeklif: {
+    baslik: () => '🕊️ Barış elçisi',
+    valid: (p, d) => { const r = G.titles[d.r], mine = ownRealm(p); return r && mine && !r.dead && atWarRealms(mine, r); },
+    metin: (p, d) => { const r = G.titles[d.r]; return `<b>${r.name}</b> elçisi huzuruna çıktı: "Hükümdarım ${nm(ch(r.holder))} bu kan dökülmesine son vermek istiyor. Barış teklif ediyoruz."`; },
+    secenekler: (p, d) => {
+      const r = G.titles[d.r];
+      return [
+        { t: 'Barışı kabul et', f: () => { makePeace(ownRealm(p), r); return 'Barış imzalandı. Ordular evlerine dönüyor.'; } },
+        { t: 'Haraç iste (barış + 100💰)', f: () => { const k = ch(r.holder); if (k && k.gold >= 100 && chance(0.5)) { k.gold -= 100; p.gold += 100; makePeace(ownRealm(p), r); return 'Haracı ödediler. Barış ve 100 altın!'; } return 'Elçi öfkeyle gitti. Savaş sürüyor.'; } },
+        { t: 'Reddet', f: () => 'Elçiyi kovdun. Savaş sürecek.' },
+      ];
+    },
+  },
+
   /* ---------- Rastgele olaylar ---------- */
   dilenci: {
     w: () => 1,
@@ -133,7 +147,7 @@ const EVENTS = {
   hanci: {
     w: p => (isAdult(p) && !p.prisonerOf ? (has(p, 'sehvetli') ? 1.5 : 0.7) : 0),
     prep: p => {
-      const n = makeChar({ female: !p.female, age: rnd(18, 30), rank: 0, lordId: p.lordId, gold: rnd(2, 8), traits: ['sehvetli', 'guzel', pick(['kurnaz', 'durust', 'cesur', 'comert'])] });
+      const n = makeChar({ female: !p.female, age: rnd(18, 30), rank: 0, lordId: p.lordId, gold: rnd(2, 8), cul: localCulture(), traits: ['sehvetli', 'guzel', pick(['kurnaz', 'durust', 'cesur', 'comert'])] });
       addOp(n, p, 30);
       return { from: n.id };
     },
@@ -248,7 +262,7 @@ const EVENTS = {
   },
   yetim: {
     w: p => (isAdult(p) ? 0.4 : 0),
-    prep: p => { const k = makeChar({ age: rnd(4, 9), rank: 0, gold: 0, lordId: p.id }); return { kid: k.id }; },
+    prep: p => { const k = makeChar({ age: rnd(4, 9), rank: 0, gold: 0, lordId: p.id, cul: localCulture() }); return { kid: k.id }; },
     baslik: () => '🧒 Yetim çocuk',
     metin: (p, d) => { const k = ch(d.kid); return `Yol kenarında, ailesi vebadan ölmüş ${k.age} yaşında bir ${k.female ? 'kız' : 'oğlan'} çocuğu buldun. Adı ${k.name}. Sana kocaman gözlerle bakıyor.`; },
     secenekler: (p, d) => {

@@ -1,52 +1,54 @@
 # ⚜️ Taç ve Hançer
 
-Ortaçağda geçen, metin ağırlıklı bir **hanedan ve entrika** oyunu. Telefonda oynamak için yapıldı.
-Grafik minimum; asıl mesele **özgürlük ve mekanik**: entrika, ihanet, aşk, rüşvet, şantaj, idam, rütbe atlama, kendi krallığını kurma.
+1180 yılında, **gerçek dünya haritası** üzerinde geçen bir ortaçağ sandbox oyunu. Telefonda **yatay** oynanır.
+Crusader Kings tarzı entrika ve hanedan + Bannerlord tarzı harita, ordu ve **üstten 2D savaşlar**.
 
-> Köylü olarak doğ, şövalye ol, toprak kap, efendini devir, kendi krallığını kur... ya da darağacında sallan.
+> Köylü olarak doğ, sipahi/şövalye ol, kale kuşat, efendine isyan et, kendi krallığını kur… ya da zindanda çürü.
 
 ## Nasıl oynanır (telefonda)
 
-Oyun saf HTML/JavaScript'tir; kurulum, sunucu ya da internet gerektirmez (ilk açılıştan sonra çevrimdışı da çalışır).
-
-**En kolay yol — GitHub Pages:**
-1. GitHub'da repo → **Settings → Pages**
-2. *Source*: **Deploy from a branch**, branch: bu branch (veya `main`), klasör: `/ (root)` → **Save**
-3. Birkaç dakika sonra çıkan adresi (`https://<kullanıcı>.github.io/Mobile-Game/`) telefonda aç
-4. Tarayıcı menüsünden **"Ana ekrana ekle"** → artık uygulama gibi açılır, tam ekran çalışır
-
-**Bilgisayarda denemek için:**
+Saf HTML/JavaScript; kurulum gerektirmez. GitHub Pages ile yayınla ya da yerelde aç:
 ```bash
-python3 -m http.server 8000
-# tarayıcıda http://localhost:8000
+python3 -m http.server 8000   # sonra http://localhost:8000
 ```
 
-## Oyun mekanikleri (v0.1)
+- **Sol alttaki joystick** ile ordunu haritada yürüt. Zaman sadece hareket ederken (ya da "⏳ Bekle" açıkken) akar.
+- **Haritayı** parmakla kaydır, iki parmakla yakınlaştır. Şehre, orduya ya da araziye **dokunarak** uzaktan bilgi al ve emir ver ("Oraya git", "Takip et", "Saldır", "Konuş").
+- **Şehre** varınca asker topla, eğit, dinlen, meyhaneye uğra. Düşman şehrini **kuşat**, 3 gün sonra hücum et.
+- **Düşmana çarpınca**: savaş ekranında kahramanını joystickle yönet, askerlerine *Hücum / Bekle / Takip* emri ver — ya da otomatik çöz, ya da kaç.
+- **Sağdaki menü**: karakterin, kişiler (entrika), ordun, toprakların, dünya (krallıklar ve savaşlar), eylemler, günlük.
+
+## Dünya
+
+- **24 krallık, 101 tarihi şehir/kale**: Bizans, Anadolu Selçuklu, Eyyubiler, Kudüs, Fransa, İngiltere, Kutsal Roma, Kiev, Abbasiler, Muvahhidler…
+- Kültürler (Türk, Arap, Rum, Latin, Slav, İskandinav) isimleri, rütbe adlarını (Bey/Emir/Sultan, Lord/Dük/Kral) ve asker tiplerini (atlı okçu / ağır süvari) belirler.
+- Hükümdarlar birbirine savaş açar, barış yapar; lord orduları dolaşır, kuşatır, eşkıya avlar. Vasallar isyan edip yeni devletler kurar, krallıklar yıkılır.
+- Harita verisi: Natural Earth (kamu malı).
+
+## Sistemler
 
 | Sistem | Ne yapar |
 |---|---|
-| **Rütbeler** | Köylü → Asker → Şövalye → Lord → Dük → Kral. Terfi iste, unvan gasp et, bağımsızlık ilan et. |
-| **Görüş** | Her karakterin her karaktere -100…+100 bakışı var. Kişilik uyumu, hediyeler, ihanetler, rezaletler, zorbalık etkiler. |
-| **Kişilik** | Hırslı, kurnaz, zalim, şehvetli, korkak, açgözlü… NPC'ler kişiliklerine göre davranır. Sen kişiliğine aykırı davranırsan **stres** birikir. |
-| **Sırlar** | Yasak aşk, cinayet, zimmet, rüşvet, piç çocuk, eşkıyalık. Casuslukla öğren, şantaj yap, ifşa et. Efendin suçunu öğrenirse zindan. |
-| **Etkileşimler** | Sohbet, hediye, rüşvet, baştan çıkarma, evlilik, boşanma, casusluk, şantaj, ifşa, iftira, suikast, düello, gözdağı, yardım, hizmete girme, terfi, saraya davet, unvan bağışlama, meşrulaştırma, hapis, idam, işkence, fidye, unvana el koyma, savaş. |
-| **Yaşayan dünya** | ~100 NPC kendi başına evlenir, aldatır, entrika çevirir, öldürür, isyan eder. Sana da teklifler, tehditler, meydan okumalar gelir. |
-| **Hanedan** | Ölünce en büyük meşru çocuğunla devam edersin. Varisin yoksa oyun biter. |
-| **Savaş** | Unvan gasbı ve bağımsızlık savaşları. Ordu = kendi askerin + sana sadık vasallar + paralı askerler. |
-| **Olaylar** | 25+ rastgele olay: eşkıyalar, kumar, hancının gözdesi, köylü isyanı, kör kâhin, yetim çocuk, şantajcılar… |
+| **Ordu** | Milis, mızraklı piyade, okçu, atlı, atlı okçu, ağır süvari. Maaş, kapasite, hız. |
+| **Savaş ekranı** | ~200 birime kadar gerçek zamanlı 2D savaş; okçular, süvari hücum bonusu, moral çöküşü, kale surları. |
+| **Rütbe** | Köylü → Asker → Şövalye/Sipahi → Lord/Bey → Dük/Emir → Kral/Sultan. |
+| **Görüş & kişilik** | Herkesin herkese bakışı; kişilik uyumu, rezalet, zorbalık. Kişiliğe aykırı davranış **stres** yapar. |
+| **Sırlar** | Yasak aşk, cinayet, zimmet, rüşvet, piç çocuk, eşkıyalık; casusluk, şantaj, ifşa. |
+| **Entrika** | Evlilik, baştan çıkarma, rüşvet, iftira, suikast, düello, hapis, idam, işkence, toprak bağışı, savaş ilanı, barış, isyan, krallık ilanı. |
+| **Hanedan** | Ölünce varisinle devam; varis yoksa oyun biter. |
 
-## Dosya yapısı
+## Dosyalar
 
 ```
-index.html            giriş noktası
-css/style.css         mobil öncelikli karanlık tema
-js/data.js            isimler, özellikler, sır türleri, yer adları
-js/engine.js          dünya, karakterler, ilişkiler, sırlar, savaş, NPC yapay zekâsı, aylık döngü, kayıt
-js/actions.js         oyuncunun yapabileceği tüm eylemler
-js/events.js          olaylar (rastgele + NPC'lerin tetikledikleri)
-js/ui.js              arayüz
-sw.js, manifest       çevrimdışı çalışma + "ana ekrana ekle"
-TASARIM.md            tasarım belgesi ve yol haritası
+index.html        iskelet
+css/style.css     yatay arayüz
+js/data.js        kültürler, özellikler, sırlar, askerler, krallıklar, şehirler
+js/geo.js         kara poligonları (Natural Earth 1:50m, sadeleştirilmiş)
+js/engine.js      karakterler, görüş, sırlar, entrika yapay zekâsı, aylık döngü
+js/world.js       harita dünyası: ordular, krallık savaşları, kuşatma, zaman
+js/actions.js     oyuncu eylemleri
+js/events.js      olaylar
+js/map.js         harita çizimi, dokunmatik kontroller, joystick
+js/battle.js      üstten 2D savaş
+js/ui.js          arayüz
 ```
-
-Yeni eylem eklemek için `js/actions.js` içindeki `ACTIONS` listesine, yeni olay için `js/events.js` içindeki `EVENTS` nesnesine bir kayıt eklemek yeterli.

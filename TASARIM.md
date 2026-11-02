@@ -23,21 +23,18 @@ telefonda birkaç dakikalık oturumlarla oynanabilecek şekilde. Hikâyeyi senar
 - **Savaş:** soyut ordu gücü, aylık muharebe, savaş skoru ±100. Gasp veya bağımsızlık hedefli.
 
 ## Yol haritası
-**v0.2 — Derinlik**
-- Hamilelik süreci (9 ay) ve "çocuk kimden?" dramı
-- Konsey (mareşal, casus başı, hazinedar) — görevler ve ihanet riski
-- Mirasçı seçimi / kardeşler arası taht kavgası
-- Din ve kilise (aforoz, haçlı seferi çağrısı)
-- Gizli tarikatlar ve komplo ortaklığı (birden fazla kişiyle suikast planı)
+**v0.2 — Harita ve savaş (bitti)**
+- Gerçek harita, joystick, yatay ekran, 24 krallık / 101 şehir
+- Ordular, maaşlar, kuşatma, krallık savaşları, isyanlar
+- Üstten 2D savaş ekranı
 
-**v0.3 — Dünya**
-- Birden fazla krallık, sınırlar, basit harita
-- Ticaret ve kervanlar, kıtlık ve veba salgınları
-- Paralı asker şirketleri ve şövalye tarikatları
-- Haydut lordu olarak sahipsiz topraklara yerleşme
+**v0.3 — Derinlik**
+- Yoldaşlar (ordunda gezen, yetenekli karakterler) ve onları komutan yapma
+- Asker deneyimi ve terfi ağacı; kültüre özel birlikler (Yeniçeri öncülleri, Varangiyan muhafızları…)
+- Savaşta birlik grupları (piyade/okçu/süvari ayrı emir), arazi (orman, tepe, nehir)
+- Köyler, kervanlar, ticaret; yağma ve köy yakma
+- Hamilelik süreci, taht kavgaları, din ve aforoz
 
 **v0.4 — Cila**
-- Ses efektleri ve basit portre üreticisi
-- Hanedan ağacı ekranı, başarımlar, kronik (oyun sonu hikâye özeti)
-- Zorluk ayarları
+- Ses ve müzik, basit portre üreticisi, hanedan ağacı, başarımlar
 - Capacitor ile Android/iOS paketi
