@@ -115,6 +115,16 @@ function showScreen(name) {
   for (const id of ['setup', 'game', 'battle']) $('#' + id).classList.toggle('hidden', id !== name);
   checkRotate();
 }
+/* ---------- HUD ölçeği ---------- */
+const UI_KEY = 'tvh-ui';
+let UI_SCALE = (() => { try { const v = parseFloat(localStorage.getItem(UI_KEY)); return v >= 0.7 && v <= 1.5 ? v : 1; } catch (e) { return 1; } })();
+function applyUIScale() { document.documentElement.style.setProperty('--ui', String(UI_SCALE)); }
+function setUIScale(v) {
+  UI_SCALE = Math.round(clamp(v, 0.7, 1.5) * 10) / 10;
+  try { localStorage.setItem(UI_KEY, String(UI_SCALE)); } catch (e) { /* yok say */ }
+  applyUIScale();
+}
+applyUIScale();
 function langSwitch() {
   return `<div class="seg lang"><button data-lang="en" class="${LANG === 'en' ? 'on' : ''}">English</button><button data-lang="tr" class="${LANG === 'tr' ? 'on' : ''}">Türkçe</button></div>`;
 }
@@ -253,6 +263,7 @@ function updateHUD() {
   else sub = L(`${TURN_DAYS} gün geçer`, `${TURN_DAYS} days pass`);
   setHTML($('#endturn'), `<b>${busy ? '⏳' : L('TURU BİTİR', 'END TURN')}</b><small>${sub}</small>`);
   $('#endturn').classList.toggle('busy', busy);
+  const tw = $('#tools').offsetWidth; if (tw && tw !== UI._tw) { UI._tw = tw; document.documentElement.style.setProperty('--tw', tw + 'px'); }
   const wars = enemiesOf(realmOf(p));
   if (!status && busy) status = L('⏳ Zaman akıyor…', '⏳ Time passes…');
   if (!status && wars.length) status = L(`⚔️ Savaşta: ${wars.map(r => esc(r.name)).join(', ')}`, `⚔️ At war: ${wars.map(r => esc(r.name)).join(', ')}`);
@@ -343,6 +354,7 @@ function showPopup(info, cx, cy) {
       <p>${r ? swatch(r.color) + esc(r.name) : L('Bağımsız', 'Independent')}</p>
       <p class="small">${L('Sahibi', 'Holder')}: ${h ? `<a data-open="${h.id}">${esc(nm(h))}</a>` : '—'}${hostile ? ` <b class="bad">· ${L('DÜŞMAN', 'ENEMY')}</b>` : ''}</p>
       <p class="small">${L('Garnizon', 'Garrison')} ${s.garrison} · ${L('Refah', 'Prosperity')} %${Math.round((s.prosperity || 1) * 100)}${s.siege ? ` · 🔥 ${L('Kuşatma altında', 'Under siege')}` : ''}</p>
+      ${armyListHtml(pv)}
       <div class="pbtns">${moveButton(pv, hostile ? L('Üzerine yürü', 'March on it') : null)}<button data-pp="info">📋 ${L('Ayrıntı', 'Details')}</button></div>`;
     el.innerHTML = html;
     bindGo(el, pv);
@@ -376,16 +388,43 @@ function showPopup(info, cx, cy) {
     html = `<h3>📍 ${esc(provName(pv))}</h3>
       <p>${r ? swatch(r.color) + esc(r.name) : s ? L('Bağımsız', 'Independent') : L('Kimsenin toprağı değil', 'Unclaimed land')}</p>
       ${s ? `<p class="small">${L('Bağlı olduğu yer', 'Seat')}: ${esc(s.name)}${hostile ? ` <b class="bad">· ${L('DÜŞMAN', 'ENEMY')}</b>` : ''}</p>` : ''}
+      ${armyListHtml(pv)}
       <div class="pbtns">${moveButton(pv)}</div>`;
     el.innerHTML = html;
     bindGo(el, pv);
     if (!pp && !html.includes('data-pp')) { /* yalnızca bilgi */ }
   }
   el.querySelectorAll('[data-open]').forEach(a => a.onclick = () => { hidePopup(); openSheet(+a.dataset.open); });
+  bindArmyList(el);
   el.classList.remove('hidden');
-  const W = window.innerWidth, H = window.innerHeight, w = el.offsetWidth, h = el.offsetHeight;
-  el.style.left = clamp(cx + 12, 8, W - w - 8) + 'px';
-  el.style.top = clamp(cy - h / 2, 8, H - h - 8) + 'px';
+  // zoom ile ölçeklenen kartta konum da ölçeğe bölünür
+  const k = UI_SCALE, W = window.innerWidth, H = window.innerHeight, w = el.offsetWidth * k, h = el.offsetHeight * k;
+  el.style.left = clamp(cx + 12, 8, W - w - 8) / k + 'px';
+  el.style.top = clamp(cy - h / 2, 8, H - h - 8) / k + 'px';
+}
+/* Açılır kartta, ildeki ordular listesi */
+function armyListHtml(pv) {
+  const list = (armiesByProvince().get(pv.id) || []).slice();
+  if (!list.length) return `<p class="small muted">${L('Bu ilde ordu yok.', 'No armies in this province.')}</p>`;
+  const pp = playerParty();
+  list.sort((a, b) => (b.kind === 'player') - (a.kind === 'player') || troopCount(b) - troopCount(a));
+  return `<div class="alist">${list.map(pt => {
+    const isMe = pt.kind === 'player', c = ch(pt.owner), r = c ? realmOf(c) : null;
+    const hostile = !isMe && pp && hostileParties(pp, pt);
+    const name = pt.kind === 'bandit' ? banditName(pt) : isMe ? L('Senin ordun', 'Your army') : nm(c);
+    return `<div class="aline ${isMe ? 'me' : ''} ${hostile ? 'foe' : ''}">
+      <i class="sw" style="background:${isMe ? '#ffcf4a' : pt.kind === 'bandit' ? '#2a2420' : r ? r.color : '#8a8070'}"></i>
+      <span class="an"><b>${esc(name)}</b><small>${troopCount(pt)} ${L('asker', 'men')} · ${L('güç', 'str.')} ${partyPower(pt)}${!isMe ? ' · ' + modeName(pt.mode) : ''}</small></span>
+      <span class="ab">${isMe ? `<button data-army="${pt.id}" title="${L('Ordu', 'Army')}">⚔️</button>`
+        : `${c ? `<button data-talk="${c.id}" title="${L('Konuş', 'Talk')}">💬</button>` : ''}${pp ? `<button data-follow="${pt.id}" title="${L('Takip et', 'Follow')}">🚶</button><button class="danger" data-attack="${pt.id}" title="${L('Saldır', 'Attack')}">⚔️</button>` : ''}`}</span></div>`;
+  }).join('')}</div>`;
+}
+function bindArmyList(el) {
+  const party = id => G.parties.find(x => x.id === +id);
+  el.querySelectorAll('[data-army]').forEach(b => b.onclick = () => { hidePopup(); openDrawer('ordu'); });
+  el.querySelectorAll('[data-talk]').forEach(b => b.onclick = () => { hidePopup(); openSheet(+b.dataset.talk); });
+  el.querySelectorAll('[data-follow]').forEach(b => b.onclick = () => { const pt = party(b.dataset.follow); hidePopup(); if (pt) { orderChase(pt); CAM.follow = true; updateHUD(); } });
+  el.querySelectorAll('[data-attack]').forEach(b => b.onclick = () => { const pt = party(b.dataset.attack); hidePopup(); if (pt) { playerAttack(pt); updateHUD(); } });
 }
 function hidePopup() { const el = $('#popup'); if (el) el.classList.add('hidden'); }
 function playerAttack(pt) {
@@ -783,7 +822,7 @@ function renderSheet() {
   m.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openSheet(+b.dataset.open));
   m.querySelectorAll('[data-act]').forEach(b => b.onclick = () => doAction(b.dataset.act, +b.dataset.t));
   m.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => { const s = G.titles[b.dataset.goto]; closeModal(); closeDrawer(); CAM.follow = false; CAM.x = s.x; CAM.y = s.y; CAM.z = Math.max(CAM.z, 24); });
-  m.querySelectorAll('[data-showparty]').forEach(b => b.onclick = () => { const x = G.parties.find(q => q.id === +b.dataset.showparty); closeModal(); closeDrawer(); if (x) { CAM.follow = false; CAM.x = x.x; CAM.y = x.y; CAM.z = Math.max(CAM.z, 24); } });
+  m.querySelectorAll('[data-showparty]').forEach(b => b.onclick = () => { const x = G.parties.find(q => q.id === +b.dataset.showparty); closeModal(); closeDrawer(); if (x) { CAM.follow = false; CAM.x = x.x; CAM.y = x.y; CAM.z = Math.max(CAM.z, 24); UI.selProv = partyProv(x).id; } });
   bindTips(m);
   const bd = m.querySelector('[data-bd]');
   if (bd) bd.onclick = () => { UI.breakdown = !UI.breakdown; renderSheet(); };
@@ -860,6 +899,8 @@ function processQueue() {
 function openMenu() {
   showModal(`<div class="sheet"><button class="x" data-close>✕</button><h2>⚜️ ${L('Menü', 'Menu')}</h2>
     <h3>${L('Dil', 'Language')}</h3>${langSwitch()}
+    <h3>${L('HUD ölçeği', 'HUD scale')}</h3>
+    <div class="uiscale"><button id="uiMinus" aria-label="${L('Küçült', 'Smaller')}">−</button><output id="uiVal">${Math.round(UI_SCALE * 100)}%</output><button id="uiPlus" aria-label="${L('Büyüt', 'Larger')}">+</button></div>
     <div class="acts">
       <button class="act" id="mFull"><span class="ai">⛶</span><span class="al">${L('Tam ekran', 'Fullscreen')}</span></button>
       <button class="act" id="mHelp"><span class="ai">❓</span><span class="al">${L('Nasıl oynanır?', 'How to play')}</span></button>
@@ -868,6 +909,9 @@ function openMenu() {
     <p class="small muted">${L('Simgeler', 'Icons')}: <a href="https://game-icons.net" target="_blank" rel="noopener">game-icons.net</a> (Lorc, Delapouite ${L('ve diğerleri', 'and others')}, CC BY 3.0) · ${L('Harita', 'Map')}: Natural Earth</p></div>`, 'menu');
   const m = $('#modal');
   m.querySelector('[data-close]').onclick = closeModal;
+  const uiStep = d => { setUIScale(UI_SCALE + d); $('#uiVal').textContent = Math.round(UI_SCALE * 100) + '%'; };
+  $('#uiMinus').onclick = () => uiStep(-0.1);
+  $('#uiPlus').onclick = () => uiStep(0.1);
   bindLang(m, () => { G.terrDirty = true; $('#hudL')._h = $('#hudR')._h = $('#ctxbar')._h = $('#endturn')._h = null; updateHUD(); openMenu(); });
   $('#mFull').onclick = () => {
     const el = document.documentElement;

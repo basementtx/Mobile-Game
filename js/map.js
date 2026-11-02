@@ -8,19 +8,18 @@ const CAM = { x: 30, y: 25, z: 26, follow: true };
 const JOY = { active: false, vx: 0, vy: 0, id: null };
 let MAPCV = null, MCTX = null, LANDPATH = null, SEAPAT = null;
 let TERR = null;
-const PARTY_SCREEN = new Map(); // ordu id -> çizildiği ekran noktası (dokunma için) // TERR: { fills: [[renk, Path2D]], realmBorder: Path2D }
+// TERR: { fills: [[renk, Path2D]], realmBorder: Path2D }
 
 /* ---------- Joystick (savaş ekranı) ---------- */
 function setupJoystick(el) {
   const knob = el.querySelector('.knob');
-  const R = () => el.clientWidth / 2;
   const upd = e => {
-    const r = el.getBoundingClientRect();
+    const r = el.getBoundingClientRect(), k = r.width / (el.clientWidth || r.width);
     let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
-    const m = Math.hypot(dx, dy), max = R() * 0.8;
+    const m = Math.hypot(dx, dy), max = r.width / 2 * 0.8;
     if (m > max) { dx = dx / m * max; dy = dy / m * max; }
     JOY.vx = dx / max; JOY.vy = dy / max;
-    knob.style.transform = `translate(${dx}px, ${dy}px)`;
+    knob.style.transform = `translate(${dx / k}px, ${dy / k}px)`;
   };
   el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); JOY.active = true; JOY.id = e.pointerId; el.setPointerCapture(e.pointerId); upd(e); });
   el.addEventListener('pointermove', e => { if (JOY.active && e.pointerId === JOY.id) upd(e); });
@@ -237,45 +236,8 @@ function drawMap(time) {
     if (s.siege) drawIcon(ctx, 'fire', sx + size * 1.8, sy - size, size * 1.9, '#ff8a2a', '#1a1208');
     if (showNames || s.capital) names.push([s, sx, sy + size + 3]);
   }
-  // Ordular (köşeli sancak)
-  const pulse = 0.5 + 0.5 * Math.sin(time / 180);
-  const stack = new Map(), setSize = clamp(z * 0.22, 4, 9) * 1.15;
-  PARTY_SCREEN.clear();
-  const order = G.parties.slice().sort((a, b) => (a.kind === 'player') - (b.kind === 'player'));
-  for (const pt of order) {
-    let [sx, sy] = mapToScreen(pt.x, pt.y);
-    if (sx < -30 || sx > W + 30 || sy < -30 || sy > H + 30) continue;
-    const isP = pt.kind === 'player';
-    const hostile = !isP && pp && hostileParties(pp, pt);
-    // Uzak görünümde kalabalığı azalt: yalnızca oyuncu ve düşman lord orduları
-    if (z < 14 && !isP && (pt.kind === 'bandit' || !hostile)) continue;
-    // Aynı yerdeki ordular ve yerleşim simgeleri üst üste binmesin
-    const key = Math.round(pt.x * 8) + ',' + Math.round(pt.y * 8);
-    const k = stack.get(key) || 0; stack.set(key, k + 1);
-    const onSett = SETTS.some(s => Math.abs(s.x - pt.x) < 0.12 && Math.abs(s.y - pt.y) < 0.12);
-    sx += (onSett ? setSize + 9 : 0) + k * 13; sy -= k * 3;
-    PARTY_SCREEN.set(pt.id, [sx, sy]);
-    const c = ch(pt.owner);
-    const r = c ? realmOf(c) : null;
-    const n = troopCount(pt);
-    const rad = clamp(3.5 + Math.sqrt(n) * 0.4, 4.5, 10) * (z < 14 ? 0.75 : 1) * (isP ? 1.2 : 1);
-    if (hostile) { ctx.strokeStyle = `rgba(255,70,50,${0.45 + pulse * 0.5})`; ctx.lineWidth = 2; ctx.strokeRect(sx - rad - 4, sy - rad * 1.8 - 3, rad * 2 + 8, rad * 2.6 + 6); }
-    const col = isP ? '#ffcf4a' : pt.kind === 'bandit' ? '#2a2420' : r ? r.color : '#8a8070';
-    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(sx - rad * 0.9 + 1.5, sy + rad * 0.45, rad * 1.8, rad * 0.35);
-    ctx.strokeStyle = '#1a1208'; ctx.lineWidth = 1.6;
-    ctx.beginPath(); ctx.moveTo(sx - rad * 0.6, sy + rad * 0.6); ctx.lineTo(sx - rad * 0.6, sy - rad * 1.7); ctx.stroke();
-    ctx.fillStyle = col; ctx.strokeStyle = isP ? '#fff' : 'rgba(0,0,0,0.7)'; ctx.lineWidth = isP ? 2 : 1;
-    ctx.beginPath(); ctx.moveTo(sx - rad * 0.6, sy - rad * 1.7); ctx.lineTo(sx + rad * 1.1, sy - rad * 1.7); ctx.lineTo(sx + rad * 0.7, sy - rad * 1.15); ctx.lineTo(sx + rad * 1.1, sy - rad * 0.6); ctx.lineTo(sx - rad * 0.6, sy - rad * 0.6); ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillRect(sx - rad * 0.55, sy - rad * 0.5, rad * 1.1, rad * 1.1); ctx.strokeRect(sx - rad * 0.55, sy - rad * 0.5, rad * 1.1, rad * 1.1);
-    if (pt.kind === 'bandit') drawIcon(ctx, 'death-skull', sx, sy + 0.05 * rad, rad * 1.05, '#e8e0d0');
-    if (isP || z >= 34 || (hostile && z >= 18)) {
-      ctx.font = `700 ${isP ? 12 : 10}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.fillStyle = isP ? '#ffe08a' : hostile ? '#ffb4a8' : '#f2ead8';
-      const label = isP ? `${L('Sen', 'You')} · ${n}` : `${n}`;
-      ctx.strokeText(label, sx, sy + rad * 0.85 + 2); ctx.fillText(label, sx, sy + rad * 0.85 + 2);
-    }
-    if (pt.mode === 'siege' && pt.sid && G.titles[pt.sid] && G.titles[pt.sid].siege) drawIcon(ctx, 'crossed-swords', sx + rad + 8, sy - rad, 12, '#ffd2c0', '#1a1208');
-  }
+  // Ordular: haritada gezinen figür yok; her ilde, o ildeki askerlerin sayısı rozet olarak yazar
+  drawArmyBadges(ctx, W, H, z, pp, SETTS);
   // Tur durakları
   if (route) {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '700 10px system-ui, sans-serif';
@@ -295,11 +257,80 @@ function drawMap(time) {
     ctx.strokeText(s.name, x, y); ctx.fillText(s.name, x, y);
   }
 }
+/* İl -> o ildeki ordular */
+function armiesByProvince() {
+  const map = new Map();
+  for (const pt of G.parties) {
+    const pv = partyProv(pt);
+    if (!pv) continue;
+    let a = map.get(pv.id); if (!a) map.set(pv.id, a = []);
+    a.push(pt);
+  }
+  return map;
+}
+/* Bir ildeki orduları taraflara göre topla (oyuncu, krallıklar, eşkıyalar) */
+function armyGroups(list, pp) {
+  const groups = new Map();
+  for (const pt of list) {
+    const isP = pt.kind === 'player';
+    const c = ch(pt.owner), r = c ? realmOf(c) : null;
+    const key = isP ? 'player' : pt.kind === 'bandit' ? 'bandit' : r ? r.id : 'o' + pt.owner;
+    let g = groups.get(key);
+    if (!g) groups.set(key, g = { key, n: 0, parties: [], isP, bandit: pt.kind === 'bandit', col: isP ? '#ffcf4a' : pt.kind === 'bandit' ? '#2a2420' : r ? r.color : '#8a8070', hostile: false, siege: false });
+    g.n += troopCount(pt); g.parties.push(pt);
+    if (!isP && pp && hostileParties(pp, pt)) g.hostile = true;
+    if (pt.mode === 'siege' && pt.sid && G.titles[pt.sid] && G.titles[pt.sid].siege) g.siege = true;
+  }
+  return [...groups.values()].sort((a, b) => b.isP - a.isP || b.hostile - a.hostile || b.n - a.n);
+}
+function fmtCount(n) { return n >= 10000 ? Math.round(n / 1000) + 'k' : n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n); }
+function drawArmyBadges(ctx, W, H, z, pp, SETTS) {
+  const byProv = armiesByProvince();
+  const fs = clamp(z * 0.4, 9, 12), h = Math.round(fs + 6), sq = h - 4;
+  ctx.font = `700 ${fs}px system-ui, -apple-system, sans-serif`;
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  for (const [pid, list] of byProv) {
+    const pv = PROV[pid];
+    let [sx, sy] = mapToScreen(pv.x, pv.y);
+    if (sx < -80 || sx > W + 80 || sy < -30 || sy > H + 30) continue;
+    let groups = armyGroups(list, pp);
+    if (z < 14) groups = groups.filter(g => g.isP || (g.hostile && !g.bandit));
+    if (!groups.length) continue;
+    // Uzaktan bakarken ilde tek rozet: önce oyuncu, sonra düşman, sonra en büyük; başka taraf varsa "+"
+    let more = false;
+    if (z < 24 && groups.length > 1) { more = true; groups = [groups[0]]; }
+    // Yerleşim ilinde rozetler kalenin altına (adın üstüne) gelir
+    const sett = pv.sett >= 0;
+    const size = clamp(z * 0.22, 4, 9) * 1.15;
+    const label = g => fmtCount(g.n) + (more ? '+' : '');
+    const widths = groups.map(g => sq + 6 + ctx.measureText(label(g)).width + 5);
+    const total = widths.reduce((a, b) => a + b, 0) + (groups.length - 1) * 3;
+    let x = sx - total / 2;
+    // Yerleşim ilinde rozet, şehir adının altına gelir
+    const named = z >= 16 || (SETTS[pv.sett] && SETTS[pv.sett].capital);
+    const y = sett ? sy + size + 3 + (named ? clamp(z * 0.42, 10, 15) + 4 : 0) : sy - h / 2;
+    groups.forEach((g, i) => {
+      const w = widths[i];
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x + 1.5, y + 1.5, w, h);
+      ctx.fillStyle = g.isP ? '#2a1d0c' : '#16110c'; ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = g.col; ctx.fillRect(x + 2, y + 2, sq, sq);
+      if (g.bandit) drawIcon(ctx, 'death-skull', x + 2 + sq / 2, y + 2 + sq / 2, sq * 0.9, '#e8e0d0');
+      else if (g.isP) drawIcon(ctx, 'crossed-swords', x + 2 + sq / 2, y + 2 + sq / 2, sq * 0.85, '#1a1208');
+      else if (g.siege) drawIcon(ctx, 'fire', x + 2 + sq / 2, y + 2 + sq / 2, sq * 0.85, '#fff2d0');
+      ctx.fillStyle = g.isP ? '#ffe08a' : g.hostile ? '#ffb4a8' : '#f2ead8';
+      ctx.fillText(label(g), x + sq + 6, y + h / 2 + 0.5);
+      ctx.lineWidth = g.isP || g.hostile ? 2 : 1;
+      ctx.strokeStyle = g.isP ? '#ffd76a' : g.hostile ? '#e0483a' : 'rgba(0,0,0,0.9)';
+      ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+      x += w + 3;
+    });
+  }
+}
 /* Oyuncunun rotası: çizgi noktaları ve tur durakları */
 function routePreview(pp) {
-  const pts = [[pp.x, pp.y]], stops = [];
   let from = partyProv(pp);
   if (!from) return null;
+  const pts = [[from.x, from.y]], stops = [];
   if (pp.leg && G.turnLeft > 0) {
     const e = pp.leg.pts[pp.leg.pts.length - 1];
     pts.push(e); stops.push({ x: e[0], y: e[1], n: 1 });
@@ -368,7 +399,6 @@ function mapTap(cx, cy) {
   const r = MAPCV.getBoundingClientRect();
   const sx = cx - r.left, sy = cy - r.top;
   let best = null, bd = 22;
-  for (const pt of G.parties) { const sp = PARTY_SCREEN.get(pt.id); if (!sp) continue; const dd = Math.hypot(sp[0] - sx, sp[1] - sy + 6); if (dd < bd) { bd = dd; best = { kind: 'party', obj: pt }; } }
   for (const s of settlements()) { const [px, py] = mapToScreen(s.x, s.y); const dd = Math.hypot(px - sx, py - sy); if (dd < bd) { bd = dd; best = { kind: 'sett', obj: s }; } }
   if (best) { UI.selProv = partyProv(best.obj).id; showPopup(best, cx, cy); }
   else {
