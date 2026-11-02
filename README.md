@@ -1,7 +1,7 @@
 # ⚜️ Crown & Dagger (Taç ve Hançer)
 
 1180 yılında, **gerçek dünya haritası** üzerinde geçen, **tur tabanlı** bir ortaçağ sandbox oyunu. Telefonda **yatay** oynanır.
-Crusader Kings tarzı entrika ve hanedan + il il bölünmüş strateji haritası, ordular ve **üstten 2D savaşlar**.
+Crusader Kings tarzı entrika ve hanedan + Age of History tarzı il il bölünmüş strateji haritası ve turlu savaşlar.
 
 Oyun varsayılan olarak **İngilizce**dir; dil, açılış ekranından ya da ☰ Menü → Dil'den **Türkçe** yapılabilir.
 
@@ -18,7 +18,7 @@ python3 -m http.server 8000   # sonra http://localhost:8000
 - Harita **illere** bölünmüştür (keskin sınırlı çokgenler); renkler krallıkları, kalın çizgiler krallık sınırlarını gösterir.
 - Bir **ile, şehre ya da orduya dokun** → "Buraya git": rota çizilir, sarı elmaslar her turun sonunda nerede olacağını gösterir. Ordun bir turda hareket puanı kadar il ilerler (deniz geçişi 2 puan, süvari hızlandırır).
 - **Şehrin ilindeyken** asker topla, eğit, dinlen, meyhaneye uğra. Düşman şehrini **kuşat**, 3 gün sonra hücum et.
-- **Düşmanla karşılaşınca**: savaş ekranında kahramanını joystickle yönet, askerlerine *Hücum / Bekle / Takip* emri ver — ya da otomatik çöz, ya da kaç. Her askerin üzerinde **seviyesi Roma rakamıyla** (I–IV) yazar.
+- **Düşmanla karşılaşınca**: Age of History tarzı **turlu savaş** başlar: iki ordunun gücü, birlik seviyeleri (I–IV), komutan ve surlar sonucu belirler; istersen geri çekilirsin — ya da otomatik çöz, ya da kaç.
 - **Sağdaki menü**: karakterin, kişiler (entrika), ordun, toprakların, dünya (krallıklar ve savaşlar), eylemler, günlük.
 
 ## Dünya

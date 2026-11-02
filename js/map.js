@@ -1,46 +1,13 @@
 'use strict';
 /* =========================================================
    Crown & Dagger — Harita çizimi (keskin sınırlı iller),
-   dokunmatik kontroller; savaş ekranı joystick'i
+   dokunmatik kontroller
    ========================================================= */
 
 const CAM = { x: 30, y: 25, z: 26, follow: true };
-const JOY = { active: false, vx: 0, vy: 0, id: null };
 let MAPCV = null, MCTX = null, LANDPATH = null, SEAPAT = null;
 let TERR = null;
 // TERR: { fills: [[renk, Path2D]], realmBorder: Path2D }
-
-/* ---------- Joystick (savaş ekranı) ---------- */
-function setupJoystick(el) {
-  const knob = el.querySelector('.knob');
-  const upd = e => {
-    const r = el.getBoundingClientRect(), k = r.width / (el.clientWidth || r.width);
-    let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
-    const m = Math.hypot(dx, dy), max = r.width / 2 * 0.8;
-    if (m > max) { dx = dx / m * max; dy = dy / m * max; }
-    JOY.vx = dx / max; JOY.vy = dy / max;
-    knob.style.transform = `translate(${dx / k}px, ${dy / k}px)`;
-  };
-  el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); JOY.active = true; JOY.id = e.pointerId; el.setPointerCapture(e.pointerId); upd(e); });
-  el.addEventListener('pointermove', e => { if (JOY.active && e.pointerId === JOY.id) upd(e); });
-  const end = e => { if (e.pointerId !== JOY.id) return; JOY.active = false; JOY.vx = JOY.vy = 0; knob.style.transform = ''; };
-  el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
-}
-const KEYS = {};
-window.addEventListener('keydown', e => { KEYS[e.key.toLowerCase()] = true; });
-window.addEventListener('keyup', e => { KEYS[e.key.toLowerCase()] = false; });
-function keyVector() {
-  let x = 0, y = 0;
-  if (KEYS.w || KEYS.arrowup) y -= 1; if (KEYS.s || KEYS.arrowdown) y += 1;
-  if (KEYS.a || KEYS.arrowleft) x -= 1; if (KEYS.d || KEYS.arrowright) x += 1;
-  return [x, y];
-}
-function moveInput() {
-  if (JOY.active) return [JOY.vx, JOY.vy];
-  const [x, y] = keyVector();
-  if (x || y) { const m = Math.hypot(x, y); return [x / m, y / m]; }
-  return [0, 0];
-}
 
 /* ---------- Harita kurulumu ---------- */
 function setupMap(cv) {

@@ -265,21 +265,41 @@ button.wide { display: block; width: 100%; text-align: left; background: var(--h
   width: min(520px, calc(100% - 300px)); min-width: 260px; background: rgba(14,10,7,.97); border: 1px solid var(--seam2); border-left: 4px solid var(--gilt); padding: 9px 13px; font-size: 14px; pointer-events: none; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
-/* ---------- Savaş ekranı ---------- */
-#bcv { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
-#btop { position: absolute; top: calc(6px + var(--st)); left: 50%; transform: translateX(-50%); z-index: 5; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center;
-  background: var(--glass); border: 1px solid var(--seam2); border-top: 2px solid var(--gilt); padding: 4px 12px; font: 700 15px var(--font-ui); }
-#btop .sa { color: #8fb6f0; } #btop .sb { color: #f08f84; } #btop .bt { color: var(--ash); font-size: 12px; }
-#btop .hhp { width: 120px; } #btop .hhp small { font: 11px var(--font-body); color: var(--ash); }
-#bmsg { position: absolute; top: calc(52px + var(--st)); left: 50%; transform: translateX(-50%); z-index: 5; background: rgba(60,20,14,.92); border: 1px solid #8a3a2c; border-left: 4px solid var(--blood); padding: 5px 14px; font: 600 15px var(--font-body); }
-#border { position: absolute; right: calc(10px + var(--sr)); bottom: calc(12px + var(--sb)); z-index: 6; display: grid; grid-template-columns: repeat(3, auto); gap: 4px; }
-#border button { background: var(--glass); border: 1px solid var(--seam2); border-bottom: 3px solid var(--seam2); padding: 10px 12px; font: 600 14px var(--font-body); }
-#border button.on { border-color: var(--gilt); color: var(--gilt2); background: rgba(58,43,23,.97); }
-.joy { position: absolute; left: calc(18px + var(--sl)); bottom: calc(18px + var(--sb)); width: 128px; height: 128px; z-index: 6;
-  background: repeating-linear-gradient(0deg, transparent 0 31px, rgba(234,220,192,.08) 31px 32px), repeating-linear-gradient(90deg, transparent 0 31px, rgba(234,220,192,.08) 31px 32px), rgba(18,14,10,.45);
-  border: 2px solid rgba(234,220,192,.35); touch-action: none; }
-.joy .knob { position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px;
-  background: linear-gradient(135deg, #f1c66c, #9a6b1d); border: 2px solid #1b1209; box-shadow: 0 3px 0 rgba(0,0,0,.5); pointer-events: none; transform-origin: center; }
+/* ---------- Savaş paneli (turlu) ---------- */
+.panel:has(.battle) { width: min(760px, calc(100% / var(--ui))); }
+.battle h2 { border-bottom: 1px solid var(--seam); padding-bottom: 6px; }
+.bfront { position: relative; height: 10px; background: var(--blood); border: 1px solid #000; margin: 6px 0 10px; }
+.bfront div { height: 100%; background: var(--gilt); transition: width .6s ease; }
+.bfront span { position: absolute; left: 50%; top: -1px; transform: translateX(-50%); font: 700 8px/10px var(--font-ui); letter-spacing: 1px; text-transform: uppercase; color: #1b1209; }
+.bsides { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: start; }
+.bvs { font-size: 26px; color: var(--blood); align-self: center; }
+.bside { background: var(--hide2); border: 1px solid var(--seam); border-top: 3px solid var(--seam2); padding: 8px; min-width: 0; }
+.bside.mine { border-top-color: var(--gilt); }
+.bside.foe { border-top-color: var(--blood); }
+.bhead { display: flex; gap: 6px; align-items: center; }
+.bhead .sw { margin: 0; flex: none; width: 14px; height: 28px; }
+.bhead span { min-width: 0; }
+.bhead b { display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bhead small { display: block; font-size: 11px; color: var(--ash); }
+.bcount { margin: 6px 0 3px; font-variant-numeric: tabular-nums; }
+.bcount b { font: 700 24px var(--font-ui); }
+.bcount small { color: var(--ash); font-size: 12px; }
+.bbar { height: 8px; background: #000; border: 1px solid #000; }
+.bbar div { height: 100%; transition: width .6s ease; }
+.bunits { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.bunit { display: flex; align-items: center; gap: 5px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.bunit .bi { width: 20px; text-align: center; }
+.bunit .bn { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bunit small { color: var(--ash); font-size: 11px; }
+.blog { margin: 8px 0; background: var(--hide2); border-left: 3px solid var(--seam2); padding: 4px 10px; min-height: 64px; }
+.blog p { margin: 2px 0; font-size: 13px; color: var(--ash); }
+.blog p.new { color: var(--vellum); }
+.bfoot { display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.bround { font: 700 13px var(--font-ui); color: var(--gilt2); letter-spacing: 1px; text-transform: uppercase; }
+.bfoot .opt { flex: none; }
+.bres { display: flex; flex-direction: column; gap: 2px; font-size: 13px; flex: 1; min-width: 0; }
+.bres b { font-size: 17px; }
+@media (max-width: 560px) { .bsides { grid-template-columns: 1fr; } .bvs { display: none; } }
 
 /* ---------- Döndür uyarısı ---------- */
 #rotate { position: fixed; inset: 0; z-index: 200; background: var(--ink); display: grid; place-items: center; text-align: center; padding: 24px; }
@@ -333,3 +353,18 @@ button.wide { display: block; width: 100%; text-align: left; background: var(--h
 #ctxbar { left: auto; right: calc(8px + var(--sr)); bottom: calc(10px + var(--sb) + 66px * var(--ui)); transform-origin: bottom right;
   justify-content: flex-end; max-width: calc(50vw / var(--ui)); }
 @media (max-height: 420px) { #tools button { width: 54px; height: 46px; } }
+/* Savaş paneli kısa ekranlarda sığsın; alt düğmeler her zaman görünür */
+.panel:has(.battle) { padding-bottom: 0; }
+.battle h2 { font-size: 17px; margin-bottom: 4px; padding-bottom: 4px; }
+.battle .bfront { margin: 4px 0 6px; }
+.battle .bside { padding: 6px 8px; }
+.battle .bcount { margin: 3px 0 2px; }
+.battle .bcount b { font-size: 20px; }
+.battle .bunits { margin-top: 4px; gap: 0; }
+.battle .bunit { font-size: 12px; line-height: 1.35; }
+.battle .bunit .tier { font-size: 10px; line-height: 14px; min-width: 20px; }
+.battle .blog { margin: 6px 0 0; min-height: 0; padding: 3px 10px; }
+.battle .blog p { font-size: 12px; margin: 1px 0; }
+.battle .blog p:not(:nth-last-child(-n+2)) { display: none; }
+.bfoot { position: sticky; bottom: 0; background: var(--hide); padding: 8px 0 12px; margin-top: 4px; border-top: 1px solid var(--seam); z-index: 2; }
+.opt.primary { background: linear-gradient(#e6b453, #a8741f); color: #1b1209; font-weight: 700; }

@@ -112,7 +112,7 @@ function bindTips(root) { root.querySelectorAll('[data-tip]').forEach(b => b.onc
 function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
 function showScreen(name) {
   UI.screen = name;
-  for (const id of ['setup', 'game', 'battle']) $('#' + id).classList.toggle('hidden', id !== name);
+  for (const id of ['setup', 'game']) $('#' + id).classList.toggle('hidden', id !== name);
   checkRotate();
 }
 /* ---------- HUD ölçeği ---------- */
@@ -205,7 +205,6 @@ function startGameUI() {
   showScreen('game');
   if (!_mapReady) {
     setupMap($('#mapcv'));
-    setupJoystick($('#bjoy'));
     _mapReady = true;
     buildTools();
     $('#drawer .dx').onclick = closeDrawer;
@@ -299,7 +298,6 @@ function loop(t) {
   _lastT = t;
   try {
     if (UI.screen === 'game' && G && !G.over) { tickMap(dt); if (UI.screen === 'game') drawMap(t); _hudT += dt; if (_hudT > 0.25) { _hudT = 0; updateHUD(); } }
-    else if (UI.screen === 'battle' && B) { battleStep(Math.min(dt, 0.05)); if (B) { drawBattle(); updateBattleHUD(); } }
   } catch (e) { console.error(e); }
   requestAnimationFrame(loop);
 }
@@ -462,7 +460,7 @@ function openEncounter(foe) {
     <div class="etext">${foe.kind === 'bandit' ? L('Eşkıyalar silahlarını çekip yolunu kesti!', 'Bandits draw their weapons and block your path!') : L(`${esc(nm(c))} sancakları karşında dalgalanıyor.`, `The banners of ${esc(nm(c))} wave before you.`)}
     <div class="vs"><div><b>${L('Sen', 'You')}</b>${troopCount(pp)} ${L('asker', 'men')}<br>${L('güç', 'strength')} ${mp}</div><div class="vsx">⚔</div><div><b>${foe.kind === 'bandit' ? L('Eşkıyalar', 'Bandits') : L('Düşman', 'Enemy')}</b>${troopCount(foe)} ${L('asker', 'men')}<br>${L('güç', 'strength')} ${tp}</div></div>${odds}</div>
     <div class="eopts">
-      <button class="opt primary" data-e="fight">⚔️ ${L('Savaş! (komuta et)', 'Fight! (take command)')}</button>
+      <button class="opt primary" data-e="fight">⚔️ ${L('Savaş!', 'Fight!')}</button>
       <button class="opt" data-e="auto">🎲 ${L('Komutanlara bırak (otomatik)', 'Leave it to your captains (auto)')}</button>
       <button class="opt" data-e="run">🏃 ${L('Kaçmayı dene', 'Try to flee')} (%${runC})</button>
     </div></div>`, 'event');
@@ -519,7 +517,7 @@ function openAssault(s) {
     <div class="etext">${L(`Merdivenler hazır, koçbaşı kapıya dayandı. Surlarda ${s.garrison} savunucu bekliyor.`, `The ladders are ready and the ram is at the gate. ${s.garrison} defenders wait on the walls.`)}
     <div class="vs"><div><b>${L('Sen', 'You')}</b>${troopCount(pp)} ${L('asker', 'men')}<br>${L('güç', 'strength')} ${partyPower(pp)}</div><div class="vsx">⚔</div><div><b>${L('Garnizon', 'Garrison')}</b>${s.garrison} ${L('asker', 'men')}<br>${L('güç', 'strength')} ${garrisonPower(s)}</div></div></div>
     <div class="eopts">
-      <button class="opt primary" data-e="fight">⚔️ ${L('Hücum! (komuta et)', 'Storm the walls! (take command)')}</button>
+      <button class="opt primary" data-e="fight">⚔️ ${L('Hücum!', 'Storm the walls!')}</button>
       <button class="opt" data-e="auto">🎲 ${L('Komutanlara bırak', 'Leave it to your captains')}</button>
       <button class="opt" data-e="wait">⏳ ${L('Kuşatmaya devam et', 'Continue the siege')}</button>
       <button class="opt" data-e="lift">🏳️ ${L('Kuşatmayı kaldır', 'Lift the siege')}</button>
@@ -555,46 +553,6 @@ function siegeBattle(pp, s) {
       return notes;
     },
   });
-}
-
-/* ---------- Savaş ekranı arayüzü ---------- */
-function showBattleUI(o) {
-  showScreen('battle');
-  const cv = $('#bcv');
-  const d = Math.min(2, window.devicePixelRatio || 1);
-  cv.width = cv.clientWidth * d; cv.height = cv.clientHeight * d; cv._d = d;
-  $('#border').innerHTML = [['hucum', L('⚔️ Hücum', '⚔️ Charge')], ['bekle', L('🛡️ Bekle', '🛡️ Hold')], ['takip', L('🚩 Takip', '🚩 Follow')], ['geri', L('🏳️ Çekil', '🏳️ Retreat')], ['ov', '🔭']]
-    .map(([k, l]) => `<button data-o="${k}">${l}</button>`).join('');
-  $('#border').querySelectorAll('[data-o]').forEach(b => b.onclick = () => {
-    if (!B) return;
-    const k = b.dataset.o;
-    if (k === 'ov') B.overview = !B.overview;
-    else if (k === 'geri') { if (!B.over) endBattle(false, true); }
-    else { B.order = k; B.msg = { hucum: L('Askerlerine HÜCUM emri verdin!', 'You ordered your troops to CHARGE!'), bekle: L('Askerlerin mevzilerini koruyor.', 'Your troops hold their positions.'), takip: L('Askerlerin seni takip ediyor.', 'Your troops follow you.') }[k]; B.msgT = B.t; }
-  });
-  B.msg = o.siege ? L(`${o.siege.name} surlarına hücum! Kapıdan gir.`, `Assault on the walls of ${o.siege.name}! Break in through the gate.`) : L(`${o.enemy.name} karşında. Emir ver!`, `${o.enemy.name} stands before you. Give your orders!`);
-  B.msgT = 0;
-}
-function updateBattleHUD() {
-  const a = B.units.filter(u => u.side === 0 && u.state === 'ok').length, b = B.units.filter(u => u.side === 1 && u.state === 'ok').length;
-  const hero = B.hero;
-  setHTML($('#btop'), `<span class="sa">🛡️ ${a * B.scale}</span><span class="bt">${Math.floor(B.t / 60)}:${String(Math.floor(B.t % 60)).padStart(2, '0')}</span><span class="sb">${b * B.scale} ⚔️</span>
-    <div class="hhp"><small>${esc(hero.name)}</small>${bar(Math.max(0, hero.hp), hero.max, 'hp')}</div>`);
-  $('#border').querySelectorAll('[data-o]').forEach(x => x.classList.toggle('on', x.dataset.o === B.order || (x.dataset.o === 'ov' && B.overview)));
-  const m = $('#bmsg');
-  const show = B.msg && B.t - (B.msgT || 0) < 3.5;
-  const txt = show ? B.msg : ''; if (m._t !== txt) { m._t = txt; m.textContent = txt; }
-  m.classList.toggle('hidden', !show);
-}
-function showBattleEnd() {
-  const r = B.result;
-  const notes = B.o.onEnd(r) || [];
-  const title = r.retreated ? `<h2 class="mid">🏳️ ${L('Geri çekildin', 'You retreated')}</h2>` : r.won ? `<h2 class="good">🏆 ${L('Zafer!', 'Victory!')}</h2>` : `<h2 class="bad">💀 ${L('Yenilgi', 'Defeat')}</h2>`;
-  B = null;
-  saveGame();
-  if (G.over) { renderGameOver(); return; }
-  showScreen('game');
-  resultModal(`${title}<p>${L('Senin kayıpların', 'Your losses')}: ${lossText(r.lossA)}</p><p>${L('Düşman kayıpları', 'Enemy losses')}: ${lossText(r.lossB)}</p>${r.heroDown ? `<p class="bad">${L('Ağır yaralandın. (Sağlık -35)', 'You were badly wounded. (Health -35)')}</p>` : ''}<p>${notes.join('<br>')}</p>`);
 }
 
 /* ---------- Şehir ---------- */
@@ -870,7 +828,7 @@ function closeModal() {
   UI.modal = null; UI.sheet = null;
 }
 function processQueue() {
-  if (UI.modal === 'event' || UI.modal === 'confirm' || UI.screen === 'battle' || !G) return;
+  if (UI.modal === 'event' || UI.modal === 'confirm' || BT || !G) return;
   if (G.over) { closeModal(); return renderGameOver(); }
   while (G.queue.length) {
     const q = G.queue[0], ev = EVENTS[q.id], p = P();
@@ -928,7 +886,7 @@ function openMenu() {
       <p><b>🗺️ Harita:</b> Harita illere bölünmüştür; renkler krallıkları, kalın çizgiler krallık sınırlarını gösterir. Parmakla kaydır, iki parmakla yakınlaştır.</p>
       <p><b>🚶 Hareket:</b> Bir ile, şehre ya da orduya dokun ve "Buraya git" de. Rota çizilir; sarı elmaslar her turun sonunda nerede olacağını gösterir. Ordun bir turda hareket puanı kadar il ilerler (deniz geçişi 2 puan). Süvari ordunu hızlandırır.</p>
       <p><b>🏰 Şehirler:</b> Şehrin ilindeyken düğmesi çıkar. Asker topla, milisleri eğit, dinlen, meyhaneye uğra. Düşman şehrinde "Kuşat" çıkar: 3 gün sonra hücum edersin.</p>
-      <p><b>⚔️ Savaş:</b> Düşmanla karşılaşınca savaşabilir, otomatik çözebilir ya da kaçabilirsin. Savaş ekranında kahramanını joystickle yönet. Askerlerin üzerindeki Roma rakamı seviyelerini (I–IV) gösterir. Askerlerine Hücum / Bekle / Takip emri ver. 🔭 tüm meydanı gösterir.</p>
+      <p><b>⚔️ Savaş:</b> Düşmanla karşılaşınca savaşabilir, otomatik çözebilir ya da kaçabilirsin. Savaş turlar hâlinde geçer: ordu büyüklüğü, birlik seviyeleri (I–IV), komutanın savaş yeteneği ve kuşatmada surlar sonucu belirler. Ordun dağılmak üzereyse geri çekilebilirsin.</p>
       <p><b>💰 Ordu:</b> Askerler her ay maaş ister. Ödeyemezsen kaçarlar.</p>
       <p><b>👑 Yükseliş:</b> Köylü → Asker → Şövalye/Sipahi → Lord/Bey → Dük/Emir → Kral/Sultan. Efendinden toprak iste, düşman kalelerini al, isyan et ya da kendi krallığını ilan et.</p>
       <p><b>🗡️ Entrika:</b> Kişiler panelinden birine dokun: evlilik, baştan çıkarma, rüşvet, şantaj, suikast, iftira… Her ay ${AP_MAX} hakkın var.</p>
@@ -937,7 +895,7 @@ function openMenu() {
       <p><b>🗺️ Map:</b> The map is divided into provinces; colours show realms and thick lines mark realm borders. Drag to pan, pinch to zoom.</p>
       <p><b>🚶 Movement:</b> Tap a province, city or army and choose "Move here". The route is drawn; yellow diamonds show where you will be at the end of each turn. Your army moves as many provinces per turn as its movement points (a sea crossing costs 2). Cavalry makes your army faster.</p>
       <p><b>🏰 Cities:</b> When you are in a city's province its button appears. Recruit, train militia, rest, visit the tavern. At an enemy city you can "Besiege" it and storm the walls after 3 days.</p>
-      <p><b>⚔️ Battle:</b> When you meet an enemy you can fight, auto-resolve or flee. In battle, steer your hero with the joystick. The Roman numeral on each soldier shows its tier (I–IV). Order your troops to Charge / Hold / Follow. 🔭 shows the whole field.</p>
+      <p><b>⚔️ Battle:</b> When you meet an enemy you can fight, auto-resolve or flee. Battles play out in rounds: army size, troop tiers (I–IV), your commander's martial skill and, in sieges, the walls decide the outcome. You can retreat if your army is about to break.</p>
       <p><b>💰 Army:</b> Soldiers want wages every month. If you cannot pay, they desert.</p>
       <p><b>👑 Rising:</b> Peasant → Soldier → Knight/Sipahi → Lord/Bey → Duke/Emir → King/Sultan. Ask your liege for land, take enemy castles, rebel, or proclaim your own kingdom.</p>
       <p><b>🗡️ Intrigue:</b> Tap someone in the People panel: marriage, seduction, bribes, blackmail, murder, slander… You get ${AP_MAX} actions each month.</p>
@@ -957,7 +915,7 @@ function renderGameOver() {
 }
 function checkRotate() {
   const portrait = window.innerHeight > window.innerWidth * 1.05;
-  const show = portrait && !UI.forcePortrait && (UI.screen === 'game' || UI.screen === 'battle');
+  const show = portrait && !UI.forcePortrait && UI.screen === 'game';
   $('#rotate').classList.toggle('hidden', !show);
 }
 
@@ -968,12 +926,20 @@ window.addEventListener('load', () => {
   $('#rotate').querySelector('button').onclick = () => { UI.forcePortrait = true; checkRotate(); };
   window.addEventListener('resize', () => {
     checkRotate();
-    if (UI.screen === 'battle') { const cv = $('#bcv'), d = cv._d || 1; cv.width = cv.clientWidth * d; cv.height = cv.clientHeight * d; }
   });
   if (loadGame()) {
     if (G.over) renderGameOver();
     else { afterLoad(); startGameUI(); }
   } else renderSetup();
   requestAnimationFrame(loop);
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+  // Uygulama olarak kuruluysa: her açılışta yeni sürümü kontrol et, yeni sürüm gelince bir kez sessizce yenile
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    const hadCtrl = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => { reg.update().catch(() => {}); }).catch(() => {});
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadCtrl || reloaded || UI.screen === 'game' && (G && G.turnLeft > 0)) return;
+      reloaded = true; saveGame && G && saveGame(); location.reload();
+    });
+  }
 });
