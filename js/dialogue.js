@@ -179,7 +179,6 @@ function openDialogue(id) {
   const pat = dialoguePatience(p, t);
   DLG = { t: t.id, pat, max: pat, lines: [], view: 'root', x: null, used: {}, o0: opinion(t, p), ended: false };
   npcSay(greeting(t, p));
-  hidePopup();
   renderDialogue();
 }
 function greeting(t, p) {

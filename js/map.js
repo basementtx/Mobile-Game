@@ -221,6 +221,14 @@ function drawMap(time) {
       ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(15,10,5,0.75)'; ctx.fillStyle = 'rgba(255,246,226,0.92)';
       const label = realmShort(r).toLocaleUpperCase(LANG === 'tr' ? 'tr' : 'en');
       ctx.strokeText(label, sx, sy - 14); ctx.fillText(label, sx, sy - 14);
+      const im = flagImage(r);
+      if (im) {
+        const fh = Math.round(fs * 0.95), fw = Math.round(fh * 1.5), tw = ctx.measureText(label).width;
+        const fx = sx - tw / 2 - fw - 6, fy = sy - 14 - fh / 2;
+        ctx.fillStyle = 'rgba(10,7,4,.6)'; ctx.fillRect(fx + 1.5, fy + 1.5, fw, fh);
+        ctx.drawImage(im, fx, fy, fw, fh);
+        ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(15,10,5,.9)'; ctx.strokeRect(fx - 0.5, fy - 0.5, fw + 1, fh + 1);
+      }
     }
   }
   // Yerleşimler
@@ -233,6 +241,10 @@ function drawMap(time) {
     const col = r && !r.dead ? r.color : '#777';
     const size = settMarkSize(z, s);
     drawSettMark(ctx, s, sx, sy, size, col);
+    if (s.capital && r && !r.dead && z >= 14) {
+      const im = flagImage(r);
+      if (im) { const fh = clamp(z * 0.32, 7, 11), fw = fh * 1.5, fx = sx + size + 4, fy = sy - size - fh - 1; ctx.fillStyle = 'rgba(14,10,6,.85)'; ctx.fillRect(fx - 1, fy - 1, fw + 2, fh + 2); ctx.drawImage(im, fx, fy, fw, fh); ctx.fillRect(fx - 1, fy - 1, 1, fh + 6); }
+    }
     if (s.siege) drawIcon(ctx, 'fire', sx + size * 1.9, sy - size * 1.2, size * 1.7, '#ff8a2a', '#1a1208');
     if (showNames || s.capital) names.push([s, sx, sy + size + 2.5]);
   }
@@ -320,6 +332,7 @@ function partyDest(pt) {
 function drawArmyBadges(ctx, W, H, z, pp, SETTS) {
   const clusters = new Map();
   for (const pt of G.parties) {
+    if (!armyActive(pt)) continue;
     const pv = partyProv(pt);
     if (!pv) continue;
     const still = Math.abs(pv.x - pt.x) < 0.06 && Math.abs(pv.y - pt.y) < 0.06;
@@ -458,17 +471,21 @@ function zoomAt(sx, sy, nz) {
   if (!CAM.follow) { CAM.x += mx - mx2; CAM.y += my - my2; }
 }
 function mapTap(cx, cy) {
-  if (G.turnLeft > 0) return;
   const r = MAPCV.getBoundingClientRect();
   const sx = cx - r.left, sy = cy - r.top;
-  let best = null, bd = 22;
-  for (const s of settlements()) { const [px, py] = mapToScreen(s.x, s.y); const dd = Math.hypot(px - sx, py - sy); if (dd < bd) { bd = dd; best = { kind: 'sett', obj: s }; } }
-  if (best) { UI.selProv = partyProv(best.obj).id; showPopup(best, cx, cy); }
+  if (UI.drawer) closeDrawer();
+  // Önce yerleşim işaretleri (küçük hedefler), sonra il
+  let best = null, bd = 20;
+  for (const s of settlements()) { const [px, py] = mapToScreen(s.x, s.y); const dd = Math.hypot(px - sx, py - sy); if (dd < bd) { bd = dd; best = s; } }
+  let pv = null;
+  if (best) pv = partyProv(best);
   else {
     const [mx, my] = screenToMap(sx, sy);
-    const pv = provinceAtExact(mx, my);
-    if (!pv || !isLand(mx, my) && Math.hypot(pv.x - mx, pv.y - my) > 2.5) { UI.selProv = null; hidePopup(); return; }
-    UI.selProv = pv.id;
-    showPopup({ kind: 'prov', obj: pv }, cx, cy);
+    const e = 5 / CAM.z; // kıyıda ~5 piksellik tolerans
+    const land = isLand(mx, my) || [[e, 0], [-e, 0], [0, e], [0, -e]].filter(([dx, dy]) => isLand(mx + dx, my + dy)).length >= 2;
+    if (land) pv = provinceAtExact(mx, my);
   }
+  // Denize ya da zaten seçili ile dokununca panel kapanır
+  if (!pv || (UI.provOpen && UI.selProv === pv.id)) { closeProv(); return; }
+  selectProvince(pv.id);
 }
