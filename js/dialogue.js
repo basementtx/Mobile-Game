@@ -178,6 +178,7 @@ function openDialogue(id) {
   G.ap -= 1;
   const pat = dialoguePatience(p, t);
   DLG = { t: t.id, pat, max: pat, lines: [], view: 'root', x: null, used: {}, o0: opinion(t, p), ended: false };
+  narrate(sceneLine(t, p));
   npcSay(greeting(t, p));
   renderDialogue();
 }
@@ -231,8 +232,57 @@ function memoryRemark(t, p, v) {
   return pickLine(MEM_REMARK[ms[0].t], v);
 }
 
+/* ---------- Sahne, jest ve tepki anlatımı ---------- */
+const SCENES = {
+  _: [T2('Taht salonunun loş ışığında {t} huzuruna çıktı ve eğildi.', 'In the dim light of the throne hall, {t} comes before you and bows.'), T2('Saray bahçesinde, fıskiyenin şırıltısı arasında {t} ile karşılaştın.', 'In the palace garden, amid the murmur of the fountain, you meet {t}.'), T2('Kütüphanede, parşömen yığınlarının arasında {t} seni bekliyordu.', 'In the library, among stacks of parchment, {t} is waiting for you.'), T2('Akşam yemeğinden sonra {t} ile şömine başında yalnız kaldınız.', 'After supper you and {t} are left alone by the hearth.'), T2('Avludaki talim alanında {t} kılıcını indirip sana döndü.', 'In the training yard {t} lowers their sword and turns to you.')],
+  asci: [T2('Mutfağın buharı ve baharat kokusu arasında {t} kepçesini bırakıp eğildi.', 'Amid the steam and spice of the kitchens, {t} sets down a ladle and bows.')],
+  seyis: [T2('Ahırda, atların huzursuz kişnemeleri arasında {t} şapkasını çıkardı.', 'In the stables, among restless horses, {t} doffs their cap.')],
+  muhafiz: [T2('Kapıdaki nöbet yerinde {t} mızrağını yere vurup esas duruşa geçti.', 'At the gate {t} strikes their spear on the stone and stands to attention.')],
+  ozan: [T2('{t} udunun tellerini susturdu ve sana döndü.', '{t} stills the strings of their lute and turns to you.')],
+  dansci: [T2('Müzik durdu. {t} nefes nefese, ipek eteklerini toplayarak yanına geldi.', 'The music stops. Breathless, {t} gathers their silks and comes to you.')],
+  dilenci: [T2('Saray kapısının dibinde, paçavralar içindeki {t} titreyen elini uzattı.', 'At the foot of the palace gate, {t}, dressed in rags, holds out a trembling hand.')],
+  capulcu: [T2('Arka sokağın gölgelerinden {t} çıktı; elleri belindeki bıçağın yakınında.', '{t} steps out of the shadows of a back alley, hands near the knife at their belt.')],
+  kumarbaz: [T2('Meyhanenin köşesinde {t} zarları avucunda sallayarak sana göz kırptı.', 'In a corner of the tavern {t} rattles dice in a palm and winks at you.')],
+  hekim: [T2('İlaç kokan odasında {t} şişeleri bırakıp sana baktı.', 'In a chamber smelling of tinctures, {t} sets down the vials and looks up.')],
+  katip: [T2('{t} mürekkep lekeli parmaklarıyla kalemini bıraktı.', '{t} puts down the quill with ink-stained fingers.')],
+  lover: [T2('Gizli merdivenin başında, tek bir mumun ışığında {t} seni bekliyordu.', 'At the top of the hidden stair, by the light of a single candle, {t} is waiting.')],
+  spouse: [T2('Özel dairende {t} ile baş başa kaldınız.', 'You and {t} are alone in your private chambers.')],
+  jail: [T2('Zindanın rutubetli karanlığında {t} zincirlerini şıkırdattı.', 'In the damp dark of the dungeon, {t} rattles their chains.')],
+  ruler: [T2('Elçilerin eşliğinde {t} ile yüz yüze geldin; iki saray birbirini süzüyor.', 'Flanked by envoys you meet {t} face to face; two courts size each other up.')],
+};
+function sceneLine(t, p) {
+  let bank = SCENES._;
+  if (t.prisonerOf === p.id || p.prisonerOf === t.id) bank = SCENES.jail;
+  else if (p.spouseId === t.id) bank = SCENES.spouse;
+  else if (p.lovers.includes(t.id)) bank = SCENES.lover;
+  else if (t.job && SCENES[t.job]) bank = SCENES[t.job];
+  else if (ownRealm(t) && realmOf(t) !== realmOf(p)) bank = SCENES.ruler;
+  return pickLine(bank, { t: `<b>${esc(t.name)}</b>` });
+}
+const GESTURES = [
+  [T2('dişlerini sıkarak', 'through gritted teeth'), T2('gözlerini kısarak', 'narrowing their eyes'), T2('buz gibi bir sesle', 'in an icy voice'), T2('sana tepeden bakarak', 'looking down on you')],
+  [T2('kollarını kavuşturarak', 'arms folded'), T2('kaşlarını çatarak', 'frowning'), T2('mesafeli bir tavırla', 'coolly')],
+  [T2('başını hafifçe eğerek', 'with a slight nod'), T2('düşünceli bir sesle', 'thoughtfully'), T2('sakin bir tavırla', 'calmly')],
+  [T2('gülümseyerek', 'smiling'), T2('sıcak bir sesle', 'warmly'), T2('gözleri parlayarak', 'eyes bright')],
+  [T2('yüzü aydınlanarak', 'face lighting up'), T2('elini tutarak', 'taking your hand'), T2('içtenlikle gülerek', 'laughing heartily')],
+];
+const TRAIT_GESTURE = {
+  kibirli: T2('çenesini kaldırarak', 'chin raised'), korkak: T2('gözlerini kaçırarak', 'avoiding your eyes'), sehvetli: T2('dudağını ısırarak', 'biting their lip'),
+  paranoyak: T2('etrafı kollayarak', 'glancing about'), ayyas: T2('kadehini sallayarak', 'swirling a cup'), kurnaz: T2('sinsice gülümseyerek', 'with a sly smile'),
+  durust: T2('doğrudan gözlerinin içine bakarak', 'looking you straight in the eye'), zalim: T2('soğuk bir gülümsemeyle', 'with a cold smile'),
+  dindar: T2('tespihini çekerek', 'fingering prayer beads'), cesur: T2('kılıcının kabzasına dayanarak', 'resting a hand on their sword hilt'), utangac: T2('kızararak', 'blushing'),
+};
+function npcGesture(t, p) {
+  const tr = t.traits.filter(x => TRAIT_GESTURE[x]);
+  const g = tr.length && chance(0.35) ? TRAIT_GESTURE[pick(tr)] : pick(GESTURES[tierOf(opinion(t, p))]);
+  return L(g[0], g[1]);
+}
+const REACT_UP = [T2('{t}\'in yüzü aydınlandı.', '{t}\'s face brightens.'), T2('{t} belli belirsiz gülümsedi.', 'A faint smile crosses {t}\'s lips.'), T2('{t}\'in omuzları gevşedi.', '{t}\'s shoulders relax.')];
+const REACT_DOWN = [T2('{t}\'in bakışları buz kesti.', '{t}\'s gaze turns to ice.'), T2('{t} dudaklarını büzdü.', '{t} purses their lips.'), T2('{t} bir adım geri çekildi.', '{t} takes a step back.')];
+function narrate(html) { DLG.lines.push({ w: 'nar', h: html }); }
+
 /* ---------- Konuşma kaydı ---------- */
-function npcSay(html) { DLG.lines.push({ w: 'npc', h: html }); }
+function npcSay(html) { const t = dT(), p = P(); DLG.lines.push({ w: 'npc', h: html, g: t && p ? npcGesture(t, p) : '', m: t && p ? opinion(t, p) / 100 : 0 }); }
 function meSay(html) { DLG.lines.push({ w: 'me', h: html }); }
 function sysSay(html, cls = '') { DLG.lines.push({ w: 'sys', h: html, c: cls }); }
 function dT() { return ch(DLG.t); }
@@ -243,6 +293,8 @@ function dStep(cost, fn) {
   fn(p, t);
   if (!t.alive) { DLG.ended = true; renderDialogue(); return; }
   const d = opinion(t, p) - before;
+  if (d >= 6) narrate(pickLine(REACT_UP, { t: esc(t.name) }));
+  else if (d <= -6) narrate(pickLine(REACT_DOWN, { t: esc(t.name) }));
   if (d) sysSay(`${L('Sana bakışı', 'Their opinion of you')} ${d > 0 ? '+' : ''}${d}`, d > 0 ? 'good' : 'bad');
   DLG.pat -= cost;
   if (DLG.pat <= 0 && !DLG.ended) { npcSay(pickLine(PATIENCE_OUT, { a: addrOf(t, p) })); DLG.ended = true; }
@@ -264,7 +316,7 @@ function endDialogue() {
 }
 
 /* ---------- Konular ---------- */
-function canFlirt(p, t) { return isAdult(p) && isAdult(t) && !closeKin(p, t) && p.spouseId !== t.id; }
+function canFlirt(p, t) { return isGrown(p) && isGrown(t) && !t.prisonerOf && !p.prisonerOf && p.spouseId !== t.id; }
 function rootOptions(p, t) {
   const o = [];
   const u = DLG.used;
@@ -783,7 +835,8 @@ function flirtOptions(p, t) {
   if (!t.lovers.includes(p.id)) o.push({ i: '💌', l: L('Gözlerine bakıp iltifat et', 'Hold their gaze and flatter'), h: `%${flirtChance(p, t)}`, dis: DLG.used.flirt ? L('Denedin', 'Tried') : null, f: () => dStep(1, () => flirt(p, t)) });
   const ready = t.lovers.includes(p.id) || DLG.used.flirtOk;
   if (!t.lovers.includes(p.id)) o.push({ i: '🌹', l: L('Gizli bir buluşma teklif et', 'Propose a secret tryst'), h: `%${seduceChance(p, t) + (DLG.used.flirtOk ? 15 : 0)}`, dis: !ready ? L('Önce flört etmelisin', 'Flirt first') : DLG.used.tryst ? L('Denedin', 'Tried') : null, f: () => dStep(1, () => tryst(p, t)) });
-  if (t.lovers.includes(p.id)) o.push({ i: '🌹', l: L('Birlikte gece geçir', 'Spend the night together'), f: () => dStep(1, () => { meSay(L('Bu gece seninle kalmak istiyorum.', 'I want to stay with you tonight.')); npcSay(L('Kapımı kilitlemeyeceğim...', 'I shall leave my door unlocked...')); addOp(t, p, 8); stress(p, -10); DLG.used.night = 1; if (t.spouseId) addRumor(p, t, ch(t.spouseId), 'flort', 0.05); }), dis: DLG.used.night ? L('Bu gece yeterdi', 'Enough for tonight') : null });
+  { const br = bedReq(p, t), noTime = L('Bu ay vaktin kalmadı', 'No time left this month');
+    o.push({ i: '🌙', l: L('Odana davet et (mahrem gece)', 'Invite them to your chambers'), h: `%${bedChance(p, t)} · 1⚡`, dis: br || null, f: () => { const id = t.id; endDialogue(); openIntimacy(id); } }); }
   if (isAdult(p) && !p.spouseId && !t.spouseId && !closeKin(p, t)) o.push({ i: '💍', l: L('Evlenme teklif et', 'Propose marriage'), h: `%${marryChance(p, t)}`, dis: DLG.used.marry ? L('Teklif ettin', 'Proposed') : null, f: () => dStep(1, () => propose(p, t)) });
   return o;
 }
@@ -1082,9 +1135,18 @@ function renderDialogue() {
   const rel = tagsFor(p, t);
   const opts = DLG.ended ? [] : viewOptions(p, t);
   const title = { small: L('Hal hatır', 'Small talk'), interests: L('İlgi alanları', 'Interests'), gift: L('Hediye', 'Gift'), invite: L('Etkinlik', 'Activity'), people: L('Kimin hakkında?', 'About whom?'), person: DLG.x ? esc(nm(ch(DLG.x))) : '', compliment: L('İltifat', 'Compliment'), flirt: L('Flört', 'Flirt'), request: L('Rica ve teklifler', 'Requests & proposals'), hostile: L('Sertleş', 'Get tough') }[DLG.view] || L('Ne söyleyeceksin?', 'What will you say?');
+  const r = realmOf(t);
+  const lines = DLG.lines.slice(-16), lastNpc = lines.map(l => l.w).lastIndexOf('npc');
+  const logHtml = lines.map((l, i) => {
+    if (l.w === 'sys') return `<p class="dsys ${l.c || ''}">${l.h}</p>`;
+    if (l.w === 'nar') return `<p class="dnar">${l.h}</p>`;
+    const npc = l.w === 'npc', who = npc ? t : p;
+    return `<div class="bubrow ${l.w} ${npc && i === lastNpc ? 'fresh' : ''}">${avatar(who, 34, npc ? (l.m ?? o / 100) : 0.3)}<div class="bub ${l.w}"><b>${esc(npc ? who.name : L('Sen', 'You'))}${npc && l.g ? ` <em class="gest">— ${esc(l.g)}</em>` : ''}</b><span>${l.h}</span></div></div>`;
+  }).join('');
   showModal(`<div class="dlg">
     <div class="dlg-who">
-      <div class="dlg-face">${avatar(t, 72, o / 100)}<div><h2>${esc(nm(t))}</h2><p class="small muted">${esc(titleOf(t))} · ${t.age} ${L('yaş', 'yrs')}</p></div></div>
+      <div class="dlg-portrait">${avatar(t, 96, o / 100)}${r ? `<span class="dlg-flag">${flagHtml(r, 18)}</span>` : ''}</div>
+      <h2>${esc(nm(t))}</h2><p class="small muted dlg-sub">${esc(titleOf(t))} · ${t.age} ${L('yaş', 'yrs')}</p>
       <div class="tags">${rel}</div>
       <div class="dlg-meter"><span>${L('Sana bakışı', 'Opinion')}</span>${opBadge(o)}<span class="op ${mcls}">${mood}</span></div>
       <div class="dlg-meter"><span>${L('Sabır', 'Patience')}</span><span class="pips">${'<i class="on"></i>'.repeat(Math.max(0, DLG.pat))}${'<i></i>'.repeat(Math.max(0, DLG.max - DLG.pat))}</span></div>
@@ -1092,7 +1154,7 @@ function renderDialogue() {
       <h3>${L('Bildiğin zevkleri', 'Known tastes')}</h3><div class="pchips">${prefChips}</div>
     </div>
     <div class="dlg-main">
-      <div class="dlg-log">${DLG.lines.slice(-14).map(l => l.w === 'sys' ? `<p class="dsys ${l.c || ''}">${l.h}</p>` : `<div class="bub ${l.w}"><b>${l.w === 'npc' ? esc(t.name) : L('Sen', 'You')}</b><span>${l.h}</span></div>`).join('')}</div>
+      <div class="dlg-log">${logHtml}</div>
       <div class="dlg-q">${DLG.ended ? L('Görüşme sona erdi.', 'The audience is over.') : title}</div>
       <div class="dlg-opts">${opts.map((x, i) => `<button class="dopt ${x.back ? 'back' : ''} ${x.tone || ''}" data-d="${i}" ${x.dis ? 'disabled' : ''}><span class="di">${x.i}</span><span class="dl">${esc(x.l)}${x.h || x.dis ? `<small>${esc(x.dis || x.h)}</small>` : ''}</span></button>`).join('')}
         ${DLG.ended ? `<button class="dopt primary" data-end>${L('Ayrıl', 'Leave')}</button>` : `<button class="dopt leave" data-end><span class="di">🚪</span><span class="dl">${L('Veda et', 'Take your leave')}</span></button>`}

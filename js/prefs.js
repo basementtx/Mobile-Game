@@ -182,6 +182,9 @@ const MEM_LABELS = {
   yardim: BL('Ona yardım ettin', 'You helped them'),
   ortakSir: BL('Bir sır paylaştınız', 'A shared secret'),
   kiskirtma: BL('Onu kışkırttın', 'You stirred them up'),
+  gece: BL('Birlikte geçen güzel bir gece', 'A fine night together'),
+  kotuGece: BL('Hayal kırıklığı yaratan bir gece', 'A disappointing night'),
+  ret: BL('Uygunsuz davetin', 'Your improper advance'),
 };
 function remember(c, who, type, v) {
   if (!c || !who || c.id === who.id) return;

@@ -10,6 +10,6 @@ Icons from [game-icons.net](https://game-icons.net), licensed under [CC BY 3.0](
 - **skoll**: mounted-knight
 - **zeromancer**: heart-plus
 
-Map data: Natural Earth (public domain).
+Map data: Natural Earth 1:50m land (public domain), via world-atlas@2 (ISC), simplified.
 
 Flags and coats of arms (js/flags.js) are original SVG drawings based on historical heraldry of c. 1180; some charges reuse the game-icons.net paths listed above.

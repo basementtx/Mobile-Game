@@ -9,10 +9,15 @@
 const SKIN = {
   latin: ['#f1d0b5', '#e8c09e', '#dcae8a'], nordic: ['#f6dcc8', '#f0cfb6', '#ebc6aa'], slav: ['#f0d0b4', '#e6c2a2', '#dbb592'],
   rum: ['#e2b892', '#d6a982', '#c99a74'], turk: ['#e0b58c', '#d2a47c', '#c4946c'], arap: ['#c99268', '#b57f58', '#a06e4a'],
+  cin: ['#f0d2ae', '#e6c49c', '#dab48a'], japon: ['#f2d6b6', '#e8c8a4', '#dcb994'], kore: ['#f0d4b2', '#e6c6a0', '#dab890'], mogol: ['#dcb088', '#cfa078', '#c29068'],
+  hint: ['#b07a50', '#9a6842', '#865836'], khmer: ['#b88a5c', '#a5784c', '#92683e'], viet: ['#e6c49c', '#d8b38a', '#caa278'], fars: ['#d8a87e', '#c8986e', '#b8885e'],
+  habes: ['#8a5a38', '#74482a', '#5e3a20'], afrika: ['#6e4428', '#5a361e', '#482a16'], and: ['#b07850', '#9c6842', '#885a36'], mezo: ['#b47c52', '#a06c44', '#8c5c38'],
 };
 const HAIR = {
   latin: ['#5a3a22', '#3a2618', '#7a5030', '#1e1510', '#a0703a'], nordic: ['#e3c27a', '#c98a4a', '#b5652e', '#8a5a32', '#d8b26a'], slav: ['#7a5a3a', '#5a3a22', '#c9a46a', '#3a2618'],
   rum: ['#2a1c12', '#3d2a1a', '#14100c'], turk: ['#1e1510', '#2a1c12', '#3a2618'], arap: ['#14100c', '#1e1510', '#2a1c12'],
+  cin: ['#120e0c', '#1a1410'], japon: ['#100c0a', '#1a1410'], kore: ['#120e0c', '#1e1612'], mogol: ['#140f0c', '#22180f'], hint: ['#100c0a', '#1a1410', '#24180f'],
+  khmer: ['#100c0a', '#1a1410'], viet: ['#120e0c', '#1a1410'], fars: ['#14100c', '#2a1c12'], habes: ['#0e0b09', '#16110d'], afrika: ['#0c0a08', '#14100c'], and: ['#100c0a', '#1a1410'], mezo: ['#100c0a', '#1a1410'],
 };
 const _portraitCache = new Map();
 function shade(hex, f) {

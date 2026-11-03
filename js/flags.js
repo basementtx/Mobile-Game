@@ -125,7 +125,60 @@ const FLAG_ART = {
     <text x="30" y="23" font-size="7.5" fill="#efe6cf" text-anchor="middle" font-family="'Amiri', 'Noto Naskh Arabic', 'Scheherazade', serif" direction="rtl">لا إله إلا الله</text>`,
   // Muvahhidler: kırmızı üzerinde ortada siyah-beyaz dama
   muvahhid: () => `<rect width="60" height="40" fill="#b3201f"/>${_checks(21, 11, 18, 4, TINCT.sable, TINCT.argent)}`,
+  // ---- Dünyanın geri kalanı ----
+  // Kıpçaklar: gök mavisi üzerinde altın boy damgası
+  kipcak: () => `<rect width="60" height="40" fill="#5e98c0"/><g fill="none" stroke="${TINCT.or}" stroke-width="3.4" stroke-linecap="round"><path d="M30 33 L30 17 M30 17 L21 8 M30 17 L39 8 M24 26 L36 26"/></g>`,
+  // Harezmşahlar: koyu kırmızı üzerinde Begdili (yay) damgası
+  harezm: () => `<rect width="60" height="40" fill="#7d2318"/><g fill="none" stroke="${TINCT.or}" stroke-width="3.2" stroke-linecap="round"><path d="M20 10 Q40 20 20 30 M20 10 L20 30 M30 20 L44 20"/></g>`,
+  // Kara Hıtay (Batı Liao): lacivert üzerinde altın "遼"
+  karahitay: () => `<rect width="60" height="40" fill="#2a2f6e"/>${_glyph('遼', TINCT.or)}`,
+  // Keraitler: beyaz üzerinde siyah tuğ (at kılı sancağı)
+  kerait: () => `<rect width="60" height="40" fill="#efe9da"/><path d="M30 4 L33 11 L30 10 L27 11 Z" fill="${TINCT.sable}"/><rect x="29" y="10" width="2" height="27" fill="${TINCT.sable}"/><path d="M24 13 Q30 30 36 13 Q33 24 30 26 Q27 24 24 13 Z" fill="#2a2420"/>`,
+  // Gurlular: Abbasi bağlılığının siyah sancağı, yeşil kenar
+  gur: () => `<rect width="60" height="40" fill="${TINCT.sable}"/><rect x="2" y="2" width="56" height="36" fill="none" stroke="#2f8a4e" stroke-width="2"/><text x="30" y="25" font-size="12" fill="#efe6cf" text-anchor="middle" font-family="'Amiri', 'Noto Naskh Arabic', serif" direction="rtl">غور</text>`,
+  // Çahamanalar: koyu kırmızı üzerinde altın güneş
+  chahamana: () => `<rect width="60" height="40" fill="#8e2a22"/>${_sun(30, 20, 7, TINCT.or)}`,
+  // Gahadavalalar: safran üzerinde kırmızı Garuda
+  gahadavala: () => `<rect width="60" height="40" fill="#f0a53a"/>${_eagle(13, 1.5, 0.37, '#a1261d', '#f0a53a', false)}`,
+  // Çolalar: kırmızı üzerinde altın kaplan
+  chola: () => `<rect width="60" height="40" fill="#a61c1c"/>${_lionPassant(12, 10, 0.37, '#f0a020', '#a61c1c')}<g stroke="#2a1608" stroke-width="1.1"><path d="M26 15 L27 21 M30 15 L31 22 M34 15 L35 22 M38 16 L38 22"/></g>`,
+  // Batı Xia: beyaz üzerinde siyah "夏"
+  xia: () => `<rect width="60" height="40" fill="#f2ecdc"/>${_glyph('夏', TINCT.sable)}`,
+  // Jin: altın üzerinde kırmızı "金"
+  jin: () => `<rect width="60" height="40" fill="#d9b13a"/>${_glyph('金', '#9e1b1b')}`,
+  // Song: kırmızı üzerinde altın "宋"
+  song: () => `<rect width="60" height="40" fill="#b8231f"/>${_glyph('宋', TINCT.or)}`,
+  // Goryeo: lacivert üzerinde beyaz "高麗"
+  goryeo: () => `<rect width="60" height="40" fill="#1f3f7a"/><g font-family="'Noto Serif CJK SC','Noto Sans CJK SC','SimSun',serif" font-weight="700" fill="#f4f1e6" text-anchor="middle" font-size="14"><text x="22" y="26">高</text><text x="38" y="26">麗</text></g>`,
+  // Japonya: Genpei savaşının yelpazelerindeki gibi beyaz üzerinde kızıl güneş
+  japon: () => `<rect width="60" height="40" fill="#f6f2e8"/><circle cx="30" cy="20" r="11" fill="#bc1e2d"/>`,
+  // Đại Việt: sarı üzerinde kırmızı "越"
+  daiviet: () => `<rect width="60" height="40" fill="#e8b828"/>${_glyph('越', '#a51b1b')}`,
+  // Khmer: kırmızı-mavi üzerinde beyaz Angkor kuleleri
+  khmer: () => `<rect width="60" height="40" fill="#1f3c8f"/><rect y="9" width="60" height="22" fill="#c21f2e"/><path fill="#f4f1e6" d="M14 29 L14 24 L18 24 L19 19 L21 24 L24 24 L25 17 L27 24 L28 24 L30 11 L32 24 L33 24 L35 17 L36 24 L39 24 L41 19 L42 24 L46 24 L46 29 Z"/>`,
+  // Pagan: koyu kırmızı üzerinde altın stupa
+  pagan: () => `<rect width="60" height="40" fill="#7a1f16"/><path fill="${TINCT.or}" d="M18 34 L42 34 L40 30 L20 30 Z M22 30 L38 30 L36 25 Q30 12 24 25 Z M29 15 L31 15 L30 5 Z"/>`,
+  // Srivijaya: kırmızı-beyaz sancak ve altın güneş
+  srivijaya: () => `<rect width="60" height="40" fill="#f4f1e6"/><rect width="60" height="20" fill="#b3201f"/>${_sun(30, 20, 5, TINCT.or)}`,
+  // Makurya: mavi üzerinde altın Nubya haçı
+  mukurra: () => `<rect width="60" height="40" fill="#284f8f"/>${_cross(30, 20, 26, 5, TINCT.or)}${[[30, 7], [30, 33], [17, 20], [43, 20]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3" fill="${TINCT.or}"/>`).join('')}`,
+  // Zagwe Habeşistan: sarı üzerinde kırmızı tören haçı
+  zagwe: () => `<rect width="60" height="40" fill="#e9c23a"/>${_cross(30, 18, 24, 4, '#a31b1b')}<circle cx="30" cy="18" r="6" fill="none" stroke="#a31b1b" stroke-width="2"/><rect x="28" y="28" width="4" height="10" fill="#a31b1b"/>`,
+  // Kanem: yeşil üzerinde altın mızraklar
+  kanem: () => `<rect width="60" height="40" fill="#3e6b25"/>${_icon('spears', 30, 20, 30, TINCT.or)}`,
+  // Gana: altın üzerinde siyah yılan (Wagadu'nun Bida'sı)
+  gana: () => `<rect width="60" height="40" fill="#d8a62e"/>${_icon('snake', 30, 20, 32, '#1a1410')}`,
+  // Chimor: koyu kırmızı üzerinde altın basamaklı haç (çakana)
+  chimu: () => `<rect width="60" height="40" fill="#7d2a14"/><path fill="${TINCT.or}" d="M26 6 H34 V10 H38 V14 H42 V26 H38 V30 H34 V34 H26 V30 H22 V26 H18 V14 H22 V10 H26 Z"/><circle cx="30" cy="20" r="4" fill="#7d2a14"/>`,
+  // Toltekler: yeşil üzerinde altın tüylü yılan
+  tolteka: () => `<rect width="60" height="40" fill="#226b4f"/>${_icon('snake', 30, 21, 30, TINCT.or)}<path d="M18 8 L22 14 M24 6 L26 13 M30 5 L30 12" stroke="#7fd0a8" stroke-width="2" stroke-linecap="round"/>`,
 };
+function _glyph(ch, fill) { return `<text x="30" y="28.5" font-size="24" font-weight="700" fill="${fill}" text-anchor="middle" font-family="'Noto Serif CJK SC','Noto Sans CJK SC','Songti SC','SimSun',serif">${ch}</text>`; }
+function _sun(cx, cy, r, fill) {
+  let rays = '';
+  for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; rays += `<path d="M${(cx + Math.cos(a - 0.13) * (r + 1)).toFixed(1)} ${(cy + Math.sin(a - 0.13) * (r + 1)).toFixed(1)} L${(cx + Math.cos(a) * (r * 2)).toFixed(1)} ${(cy + Math.sin(a) * (r * 2)).toFixed(1)} L${(cx + Math.cos(a + 0.13) * (r + 1)).toFixed(1)} ${(cy + Math.sin(a + 0.13) * (r + 1)).toFixed(1)} Z" fill="${fill}"/>`; }
+  return rays + `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}"/>`;
+}
 
 /* Sonradan kurulan krallıklar için hanedan rengine göre basit bir arma */
 function _hashN(s) { let h = 7; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; }

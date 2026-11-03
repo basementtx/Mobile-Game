@@ -5,7 +5,7 @@
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
-const UI = { screen: 'setup', drawer: null, filter: 'yakin', sheet: null, modal: null, breakdown: false, speed: 1, forcePortrait: false, sett: null, selProv: null, provOpen: false, hold: null, realmTab: 'genel' };
+const UI = { screen: 'setup', drawer: null, filter: 'saray', sheet: null, modal: null, breakdown: false, speed: 1, forcePortrait: false, sett: null, selProv: null, provOpen: false, hold: null, realmTab: 'genel' };
 let SETUP = null;
 
 /* ---------- Simgeler (emoji yerine game-icons.net SVG'leri) ---------- */
@@ -239,7 +239,7 @@ function renderSetup() {
 /* ---------- Oyun ekranı ---------- */
 let _mapReady = false;
 function buildTools() {
-  $('#tools').innerHTML = [['ben', '👤', L('Karakter', 'Character')], ['krallik', '👑', L('Krallık', 'Realm')], ['topraklar', '🏰', L('Topraklar', 'Domain')], ['ordu', '⚔️', L('Ordu', 'Army')], ['kisiler', '👥', L('Kişiler', 'People')], ['eylem', '🗡️', L('Entrika', 'Intrigue')], ['dunya', '🌍', L('Dünya', 'World')], ['gunluk', '📜', L('Günlük', 'Chronicle')]]
+  $('#tools').innerHTML = [['ben', '👤', L('Karakter', 'Character')], ['aile', '🌳', L('Aile', 'Family')], ['krallik', '👑', L('Krallık', 'Realm')], ['topraklar', '🏰', L('Topraklar', 'Domain')], ['ordu', '⚔️', L('Ordu', 'Army')], ['kisiler', '👥', L('Kişiler', 'People')], ['eylem', '🗡️', L('Entrika', 'Intrigue')], ['dunya', '🌍', L('Dünya', 'World')], ['gunluk', '📜', L('Günlük', 'Chronicle')]]
     .map(([k, i, l]) => `<button data-drawer="${k}"><span>${i}</span>${l}</button>`).join('');
   $('#tools').querySelectorAll('[data-drawer]').forEach(b => b.onclick = () => openDrawer(b.dataset.drawer));
 }
@@ -488,7 +488,7 @@ function siegeBattle(pp, s) {
 }
 
 /* ---------- Çekmece paneller ---------- */
-function drawerTitle(k) { return { ben: L('👤 Karakter', '👤 Character'), kisiler: L('👥 Kişiler', '👥 People'), ordu: L('⚔️ Ordu', '⚔️ Army'), topraklar: L('🏰 Kraliyet arazisi', '🏰 Royal Domain'), dunya: L('🌍 Dünya', '🌍 World'), eylem: L('🗡️ Entrika ve kişisel eylemler', '🗡️ Intrigue & personal'), gunluk: L('📜 Günlük', '📜 Chronicle') }[k]; }
+function drawerTitle(k) { return { aile: L('🌳 Aile ve hanedan', '🌳 Family & dynasty'), ben: L('👤 Karakter', '👤 Character'), kisiler: L('👥 Kişiler', '👥 People'), ordu: L('⚔️ Ordu', '⚔️ Army'), topraklar: L('🏰 Kraliyet arazisi', '🏰 Royal Domain'), dunya: L('🌍 Dünya', '🌍 World'), eylem: L('🗡️ Entrika ve kişisel eylemler', '🗡️ Intrigue & personal'), gunluk: L('📜 Günlük', '📜 Chronicle') }[k]; }
 function openDrawer(k) {
   if (G.turnLeft > 0) return;
   if (k === 'krallik') return openRealm();
@@ -501,7 +501,7 @@ function renderDrawer() {
   const body = $('#drawer .dbody');
   const sc = body.scrollTop;
   $('#drawer .dtitle').textContent = UI.drawer === 'sett' ? `${UI.settMarket ? '🏪' : '🛡️'} ${G.titles[UI.sett].name}` : UI.drawer === 'hold' ? `🏗️ ${G.titles[UI.hold].name}` : drawerTitle(UI.drawer);
-  body.innerHTML = { ben: tabBen, kisiler: tabKisiler, ordu: tabOrdu, topraklar: tabToprak, dunya: tabDunya, eylem: tabEylem, gunluk: tabGunluk, sett: settlementPanel, hold: holdPanel }[UI.drawer](p);
+  body.innerHTML = { aile: tabAile, ben: tabBen, kisiler: tabKisiler, ordu: tabOrdu, topraklar: tabToprak, dunya: tabDunya, eylem: tabEylem, gunluk: tabGunluk, sett: settlementPanel, hold: holdPanel }[UI.drawer](p);
   body.scrollTop = sc;
   body.querySelectorAll('[data-open]').forEach(b => b.onclick = e => { e.stopPropagation(); openSheet(+b.dataset.open); });
   body.querySelectorAll('[data-filter]').forEach(b => b.onclick = () => { UI.filter = b.dataset.filter; renderDrawer(); });
@@ -512,6 +512,7 @@ function renderDrawer() {
   bindRealmUI(body);
   if (UI.drawer === 'sett') bindSettlement(body);
   if (UI.drawer === 'ordu') bindArmyTab(body);
+  if (UI.drawer === 'aile') bindFamily(body);
 }
 function personLine(c, p) {
   return `<button class="person" data-open="${c.id}">${avatar(c)}
@@ -538,6 +539,7 @@ function tabBen(p) {
     ${spouse ? personLine(spouse, p) : ''}${lovers.map(l => personLine(l, p)).join('')}${kids.map(k => personLine(k, p)).join('')}
     ${!spouse && !kids.length && !lovers.length ? `<p class="small muted">${L('Henüz bir ailen yok.', 'You have no family yet.')}</p>` : ''}</div>`;
   if (prisoners.length) html += `<div class="card"><h3>⛓️ ${L('Zindanındakiler', 'Your prisoners')}</h3>${prisoners.map(x => personLine(x, p)).join('')}</div>`;
+  html += intimacyCard(p);
   html += myTastesCard(p);
   html += `<div class="card"><h3>🗝️ ${L('Bildiğin sırlar', 'Secrets you know')}</h3>${known.length ? known.map(s => `<p class="secret">• ${esc(secretText(s))}</p>`).join('') : `<p class="small muted">${L('Henüz kimsenin sırrını bilmiyorsun.', 'You know no one\'s secrets yet.')}</p>`}</div>`;
   html += `<div class="card"><h3>🩸 ${L('Senin sırların', 'Your secrets')}</h3>${mySecrets.length ? mySecrets.map(s => `<p class="secret ${s.pub ? 'pub' : ''}">• ${esc(secretText(s))}<small>${s.pub ? L(' (herkes biliyor)', ' (public knowledge)') : L(` (${s.known.length - 1} kişi biliyor)`, ` (${s.known.length - 1} know)`)}</small></p>`).join('') : `<p class="small muted">${L('Vicdanın (şimdilik) temiz.', 'Your conscience is clean (for now).')}</p>`}</div>`;
@@ -547,6 +549,7 @@ function filterList(p) {
   const list = living().filter(c => c.id !== p.id);
   const pr = realmOf(p);
   switch (UI.filter) {
+    case 'saray': return list.filter(c => c.lordId === p.id && !c.titles.length);
     case 'yakin': return list.filter(c => familyRel(p, c) || p.lovers.includes(c.id) || c.id === p.lordId || c.lordId === p.id ||
       (p.lordId != null && c.lordId === p.lordId) || c.prisonerOf === p.id || Math.abs(opinion(c, p)) >= 40);
     case 'krallik': return list.filter(c => pr && realmOf(c) === pr && c.rank >= 3);
@@ -558,7 +561,7 @@ function filterList(p) {
 }
 function tabKisiler(p) {
   const list = filterList(p).sort((a, b) => b.rank - a.rank || opinion(b, p) - opinion(a, p)).slice(0, 120);
-  const fs = [['yakin', L('Yakınlar', 'Close')], ['krallik', L('Krallığım', 'My realm')], ['hukumdar', L('Hükümdarlar', 'Rulers')], ['sirlar', L('Sırlar', 'Secrets')], ['esir', L('Esirler', 'Prisoners')]];
+  const fs = [['saray', L('Saray halkı', 'Court')], ['yakin', L('Yakınlar', 'Close')], ['krallik', L('Krallığım', 'My realm')], ['hukumdar', L('Hükümdarlar', 'Rulers')], ['sirlar', L('Sırlar', 'Secrets')], ['esir', L('Esirler', 'Prisoners')]];
   return `<div class="filters">${fs.map(([k, l]) => `<button data-filter="${k}" class="${UI.filter === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     <p class="small muted">${L('Sağdaki sayı onun sana bakışı. Birine dokun: entrika, evlilik, rüşvet, suikast…', 'The number on the right is their opinion of you. Tap someone to scheme, marry, bribe, murder…')}</p>
     ${list.map(c => personLine(c, p)).join('') || `<p class="muted">${L('Kimse yok.', 'Nobody.')}</p>`}`;
@@ -632,8 +635,10 @@ function renderSheet() {
       </div>
       ${secrets.length ? `<div class="card inner"><h3>🗝️ ${L('Bildiğin sırlar', 'Secrets you know')}</h3>${secrets.map(s => `<p class="secret ${s.pub ? 'pub' : ''}">• ${esc(secretText(s))}</p>`).join('')}</div>` : ''}
       ${!self ? sheetTastes(t) : ''}
+      ${intimacyCard(t)}
     </div>
     ${acts ? `<div class="scol"><button class="talkbig" data-talk ${G.ap < 1 ? 'disabled' : ''}><span>💬</span><b>${L('Konuş', 'Talk')}</b><small>${G.ap < 1 ? L('Bu ay vaktin kalmadı', 'No time left this month') : L('Sohbet, dedikodu, hediye, rica, flört… (1⚡)', 'Conversation, gossip, gifts, requests, flirting… (1⚡)')}</small></button>
+      ${isGrown(t) && isGrown(p) ? `<button class="talkbig night" data-bed ${bedReq(p, t) ? 'disabled' : ''}><span>🌙</span><b>${L('Odana davet et', 'Invite to your chambers')}</b><small>${bedReq(p, t) || L(`Mahrem bir gece · kabul şansı %${bedChance(p, t)} (1⚡)`, `An intimate night · ${bedChance(p, t)}% chance they accept (1⚡)`)}</small></button>` : ''}
       <h3>${L('Ne yapacaksın?', 'What will you do?')} <small class="muted">(${G.ap} ⚡)</small></h3><div class="acts">${acts}</div></div>` : ''}
   </div>`, 'sheet');
   const m = $('#modal');
@@ -641,6 +646,7 @@ function renderSheet() {
   m.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openSheet(+b.dataset.open));
   m.querySelectorAll('[data-act]').forEach(b => b.onclick = () => doAction(b.dataset.act, +b.dataset.t));
   const tk = m.querySelector('[data-talk]'); if (tk) tk.onclick = () => { closeModal(); openDialogue(t.id); };
+  const bedB = m.querySelector('[data-bed]'); if (bedB) bedB.onclick = () => { closeModal(); openIntimacy(t.id); };
   m.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => { const s = G.titles[b.dataset.goto]; closeModal(); closeDrawer(); centerOn(s.x, s.y, 24); const pv = partyProv(s); if (pv) selectProvince(pv.id); });
   m.querySelectorAll('[data-showparty]').forEach(b => b.onclick = () => { const x = G.parties.find(q => q.id === +b.dataset.showparty); closeModal(); closeDrawer(); if (x) { centerOn(x.x, x.y, 24); selectProvince(partyProv(x).id); } });
   bindTips(m);
@@ -772,6 +778,9 @@ function openMenu() {
       <p><b>🗡️ Entrika:</b> Birinin kartını aç: evlilik, baştan çıkarma, rüşvet, şantaj, suikast, iftira… Her ay ${AP_MAX} hakkın var.</p>
       <p><b>💬 Konuşmalar:</b> Herkesin sevdiği ve sevmediği hobileri, eşyaları ve etkinlikleri var. Başkaları hakkında söylediklerin kulaktan kulağa yayılır.</p>
       <p><b>⚔️ Taktik savaş:</b> Önce diziliş seç; her tur bir emir ver. Her taktik ikisini yener, ikisine yenilir (▲/▼). Kuşatmada koçbaşı, mancınık ve lağımla surları yık.</p>
+      <p><b>🌍 Dünya:</b> Harita tüm dünyayı kapsar: Avrupa'dan Song Çin'ine, Japonya'dan Gana'ya ve Toltek Tollan'ına kadar 47 krallık.</p>
+      <p><b>🌳 Aile:</b> Aile sekmesinde soy ağacın, gebelikler, sevgililer ve piç çocukların görünür. Çocuklarına evlilik ayarlayabilirsin.</p>
+      <p><b>🌙 Mahrem:</b> Yetişkin (18+) biriyle — eşin, sevgilin ya da saraydaki herhangi biri — bir gece geçirmeyi teklif edebilirsin. Herkesin kendi arzusu, hüneri, yönelimi ve zevkleri vardır; sevdiği bir yaklaşım bağları güçlendirir, sevmediği ilişkiyi bozar. Çocuk istemek, şansa bırakmak ya da önlem almak senin elinde. Dedikodu, yakalanma ve hastalık riski vardır.</p>
       <p><b>☠️ Ölüm:</b> Ölünce varisinle devam edersin. Varisin yoksa hanedan biter.</p>`, `
       <p><b>👑 Ruler:</b> You always begin as the ruler of a realm. You do not wander the map: you rule from your court and give orders through the map and the realm screen.</p>
       <p><b>🗺️ Provinces:</b> Tap a province or city on the map and the province panel opens on the left. It shows the holder, garrison, income, unrest and buildings; the <b>Options</b> list below shows everything you can do there. Tap the sea or the same province again to close it.</p>
@@ -784,6 +793,9 @@ function openMenu() {
       <p><b>🗡️ Intrigue:</b> Open someone's card: marriage, seduction, bribes, blackmail, murder, slander… You get ${AP_MAX} actions each month.</p>
       <p><b>💬 Conversations:</b> Everyone has hobbies, goods and activities they love or hate. What you say about others travels from ear to ear.</p>
       <p><b>⚔️ Tactical battle:</b> Pick a formation, then give one order per round. Each tactic beats two and loses to two (▲/▼). In sieges, break the walls with rams, trebuchets and mines.</p>
+      <p><b>🌍 World:</b> The map covers the whole world: 47 realms from Europe to Song China, from Japan to Ghana and Toltec Tollan.</p>
+      <p><b>🌳 Family:</b> The Family tab shows your family tree, pregnancies, lovers and bastards. You can arrange marriages for your children.</p>
+      <p><b>🌙 Intimacy:</b> You can invite an adult (18+) — your spouse, a lover, or anyone at court — to spend the night. Everyone has their own desire, skill, orientation and tastes; an approach they enjoy deepens the bond, one they dislike harms it. Try for a child, leave it to fate, or take precautions. Gossip, getting caught and disease are real risks.</p>
       <p><b>☠️ Death:</b> When you die you continue as your heir. With no heir, your dynasty ends.</p>`)}</div></div>`, 'menu');
     $('#modal').querySelector('[data-close]').onclick = closeModal;
   };
