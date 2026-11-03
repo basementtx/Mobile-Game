@@ -69,7 +69,6 @@ function bedReq(p, t) {
   if (!t || !t.alive || t.id === p.id) return L('Olmaz', 'Not possible');
   if (!isGrown(p)) return L('Henüz çok gençsin', 'You are too young');
   if (!isGrown(t)) return L('Yalnızca yetişkinler (18+)', 'Adults only (18+)');
-  if (closeKin(p, t)) return L('Yakın akraban', 'A close relative');
   if (t.prisonerOf || p.prisonerOf) return L('Esaret altında rıza olmaz', 'No consent in captivity');
   if (!attracted(t, p)) return L(`${t.name} sana o gözle bakmıyor`, `${t.name} is not drawn to you that way`);
   if (G.ap < 1) return L('Bu ay vaktin kalmadı', 'No time left this month');
@@ -84,6 +83,7 @@ function bedChance(p, t) {
   let c = seduceChance(p, t) + (sx.lib - 50) / 2.5 + sexOf(p).skill * 1.2;
   if (p.rank > t.rank) c += (p.rank - t.rank) * 4; // güç ve şan çekicidir
   if (sexOf(p).rep > 30 && (has(t, 'iffetli') || has(t, 'dindar'))) c -= 15;
+  if (closeKin(p, t)) c -= has(t, 'sehvetli') ? 15 : has(t, 'dindar') || has(t, 'durust') || has(t, 'iffetli') ? 60 : 35;
   return pct(c);
 }
 
@@ -110,6 +110,7 @@ function renderIntimacy() {
     <div class="ev-art"><div class="ev-frame">${avatar(t, 104, o / 100)}</div><b>${esc(nm(t))}</b><small>${esc(titleOf(t))} · ${t.age}</small>${opBadge(o)}
       <div class="sxmini">${sexMeter(L('Arzu', 'Desire'), sx.lib)}${knowsPref(t, 'x', 'role') ? `<p class="small">${pickB(ROLE_NAMES[sx.role])}</p>` : ''}</div></div>
     <div class="ev-main">
+      ${closeKin(p, t) ? `<p class="small bad">⚠️ ${L('Yakın akraban. Bu ilişki ortaya çıkarsa büyük bir skandal olur; çocuklarınız soy zayıflığıyla doğabilir.', 'A close relative. If this comes out it will be a great scandal; your children may be born inbred.')}</p>` : ''}
       <p class="small muted">${partner ? (p.spouseId === t.id ? L('Eşinle bir gece.', 'A night with your spouse.') : L('Gizli sevgilinle bir gece.', 'A night with your secret lover.')) : L('Davetini kabul ederse sevgilin olur. Reddederse bu konuşulur.', 'If they accept, they become your lover. If they refuse, people will talk.')}
         ${L('Kabul şansı', 'Chance they accept')}: <b class="${c >= 60 ? 'good' : c >= 30 ? 'mid' : 'bad'}">%${c}</b> · ${L('Hünerin', 'Your skill')} ${sexOf(p).skill}</p>
       <div class="dlg-q">${L('Nasıl bir gece?', 'What kind of night?')} <small class="muted">♥ ${L('sever', 'likes')} · ✗ ${L('sevmez', 'dislikes')} · ? ${L('bilinmiyor', 'unknown')}</small></div>
@@ -217,6 +218,7 @@ function spendNight(p, t, k, childMode) {
   if (chance(0.3) && sp.skill < 20) { sp.skill++; fx.push([L('Hünerin arttı', 'Your skill grew'), 'good']); }
   if (!wasPartner) { sp.n++; sp.rep = Math.min(100, sp.rep + 4); }
   traitStress(p, { iffetli: 10, sehvetli: -6 });
+  if (closeKin(p, t)) { const s2 = traitStress(p, { dindar: 15, durust: 8 }); if (s2) fx.push([L(`Vicdan azabı: stres +${s2}`, `Pangs of conscience: stress +${s2}`), 'bad']); }
   out.log = L(`🌹 ${nm(t)} ile bir gece: ${out.title.toLocaleLowerCase('tr')}.`, `🌹 A night with ${nm(t)}: ${out.title.toLowerCase()}.`);
   return out;
 }

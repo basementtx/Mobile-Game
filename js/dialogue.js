@@ -316,7 +316,7 @@ function endDialogue() {
 }
 
 /* ---------- Konular ---------- */
-function canFlirt(p, t) { return isGrown(p) && isGrown(t) && !closeKin(p, t) && !t.prisonerOf && p.spouseId !== t.id; }
+function canFlirt(p, t) { return isGrown(p) && isGrown(t) && !t.prisonerOf && !p.prisonerOf && p.spouseId !== t.id; }
 function rootOptions(p, t) {
   const o = [];
   const u = DLG.used;

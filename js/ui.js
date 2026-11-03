@@ -638,7 +638,7 @@ function renderSheet() {
       ${intimacyCard(t)}
     </div>
     ${acts ? `<div class="scol"><button class="talkbig" data-talk ${G.ap < 1 ? 'disabled' : ''}><span>💬</span><b>${L('Konuş', 'Talk')}</b><small>${G.ap < 1 ? L('Bu ay vaktin kalmadı', 'No time left this month') : L('Sohbet, dedikodu, hediye, rica, flört… (1⚡)', 'Conversation, gossip, gifts, requests, flirting… (1⚡)')}</small></button>
-      ${isGrown(t) && isGrown(p) && !closeKin(p, t) ? `<button class="talkbig night" data-bed ${bedReq(p, t) ? 'disabled' : ''}><span>🌙</span><b>${L('Odana davet et', 'Invite to your chambers')}</b><small>${bedReq(p, t) || L(`Mahrem bir gece · kabul şansı %${bedChance(p, t)} (1⚡)`, `An intimate night · ${bedChance(p, t)}% chance they accept (1⚡)`)}</small></button>` : ''}
+      ${isGrown(t) && isGrown(p) ? `<button class="talkbig night" data-bed ${bedReq(p, t) ? 'disabled' : ''}><span>🌙</span><b>${L('Odana davet et', 'Invite to your chambers')}</b><small>${bedReq(p, t) || L(`Mahrem bir gece · kabul şansı %${bedChance(p, t)} (1⚡)`, `An intimate night · ${bedChance(p, t)}% chance they accept (1⚡)`)}</small></button>` : ''}
       <h3>${L('Ne yapacaksın?', 'What will you do?')} <small class="muted">(${G.ap} ⚡)</small></h3><div class="acts">${acts}</div></div>` : ''}
   </div>`, 'sheet');
   const m = $('#modal');

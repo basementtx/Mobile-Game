@@ -262,6 +262,7 @@ function becomeLovers(a, b) {
   if (!b.lovers.includes(a.id)) b.lovers.push(a.id);
   addOp(a, b, 15); addOp(b, a, 15);
   if (a.spouseId || b.spouseId) addSecret('zina', a.id, b.id, [a.id, b.id]);
+  if (closeKin(a, b) && !G.secrets.some(s => s.type === 'ensest' && [s.actor, s.target].includes(a.id) && [s.actor, s.target].includes(b.id))) addSecret('ensest', a.id, b.id, [a.id, b.id]);
 }
 function breakUp(a, b) {
   a.lovers = a.lovers.filter(x => x !== b.id);
@@ -350,6 +351,14 @@ function exposeSecret(s) {
     for (const x of living()) if (familyRel(x, t) || x.lovers.includes(t.id)) addOp(x, a, s.type === 'cinayet' ? -80 : -40);
     addOp(t, a, -60);
     if (s.type === 'cinayet' && closeKin(a, t)) addTrait(a, 'akrabakatili');
+  }
+  if (s.type === 'ensest' && t && a) {
+    t.shame += 25; t.prestige -= 25;
+    for (const x of living()) {
+      if (x.id === a.id || x.id === t.id) continue;
+      const pen = has(x, 'dindar') || has(x, 'durust') ? -30 : -10;
+      if (familyRel(x, a) || familyRel(x, t) || has(x, 'dindar') || has(x, 'durust')) { addOp(x, a, pen); addOp(x, t, pen); }
+    }
   }
   if (s.type === 'pic' && t && a) {
     if (a.spouseId) { const sp = ch(a.spouseId); if (sp) addOp(sp, a, -60); }
@@ -446,7 +455,7 @@ function income(c) {
 /* ---------- Ortak etkileşim sonuçları (oyuncu ve NPC aynı kurallar) ---------- */
 function seduceChance(a, b) {
   return clamp(Math.round(20 + (stat(a, 'cek') - 5) * 6 + opinion(b, a) / 2 + (has(b, 'sehvetli') ? 20 : 0) -
-    (has(b, 'iffetli') ? 35 : 0) - (b.spouseId ? 10 : 0)), 3, 92);
+    (has(b, 'iffetli') ? 35 : 0) - (b.spouseId ? 10 : 0) - (closeKin(a, b) ? (has(b, 'sehvetli') ? 15 : 35) : 0)), 3, 92);
 }
 function marryChance(a, b) {
   return clamp(Math.round(15 + opinion(b, a) / 1.5 + (a.rank - b.rank) * 15 + (stat(a, 'cek') - 5) * 3), 2, 95);
@@ -523,6 +532,7 @@ function birth(mother, father) {
     age: 0, traits: inheritTraits(mother, father), gold: 0, cul: (legit || mother).cul,
     base: Object.fromEntries(Object.keys(STATS).map(k => [k, clamp(Math.round((mother.base[k] + father.base[k]) / 2) + rnd(-2, 2), 1, 14)])),
   });
+  if (closeKin(mother, father) && chance(0.5)) addTrait(kid, 'akrabacocugu');
   kid.motherId = mother.id;
   mother.children.push(kid.id);
   if (!father.children.includes(kid.id)) father.children.push(kid.id);
