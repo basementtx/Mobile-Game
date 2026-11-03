@@ -226,14 +226,16 @@ function renderSetup() {
   $('#startBtn').onclick = () => {
     const btn = $('#startBtn'); btn.textContent = L('Dünya kuruluyor…', 'Forging the world…'); btn.disabled = true;
     setTimeout(() => {
-      const clean = v => v.replace(/[<>&"']/g, '').trim();
-      const C = CULTURES[REALMS[S.realm].kul];
-      newWorld({ name: clean(S.name) || pick(S.female ? C.f : C.m), dyn: clean(S.dyn) || REALMS[S.realm].han, female: S.female, realm: S.realm, traits: S.traits, base: S.base });
-      SETUP = null;
-      startGameUI();
+      try {
+        const clean = v => v.replace(/[<>&"']/g, '').trim();
+        const C = CULTURES[REALMS[S.realm].kul];
+        newWorld({ name: clean(S.name) || pick(S.female ? C.f : C.m), dyn: clean(S.dyn) || REALMS[S.realm].han, female: S.female, realm: S.realm, traits: S.traits, base: S.base });
+        SETUP = null;
+        startGameUI();
+      } catch (e) { bootError(e); }
     }, 30);
   };
-  if ($('#contBtn')) $('#contBtn').onclick = () => { if (loadGame()) { afterLoad(); startGameUI(); } };
+  if ($('#contBtn')) $('#contBtn').onclick = () => { try { if (loadGame()) { afterLoad(); startGameUI(); } } catch (e) { bootError(e); } };
 }
 
 /* ---------- Oyun ekranı ---------- */
@@ -817,6 +819,31 @@ function checkRotate() {
 }
 
 /* ---------- Başlat ---------- */
+/* Açılışta bir hata olursa kahverengi boş ekran yerine ne olduğunu göster */
+let BOOTED = false;
+function bootError(e) {
+  console.error(e);
+  const msg = e && (e.stack || e.message) ? String(e.stack || e.message).split('\n').slice(0, 4).join('\n') : String(e);
+  showScreen('setup');
+  $('#setup').innerHTML = `<div class="boot err"><div class="boot-logo">⚠️</div><h1>${L('Oyun açılamadı', 'The game could not start')}</h1>
+    <p>${L('Bir hata oluştu. Lütfen aşağıdaki yazının ekran görüntüsünü gönder.', 'Something went wrong. Please send a screenshot of the text below.')}</p>
+    <pre>${esc(msg)}</pre>
+    <div class="boot-btns"><button class="primary" id="bootRetry">${L('Tekrar dene', 'Try again')}</button>
+    ${hasSave() ? `<button class="ghost" id="bootNew">${L('Yeni oyun başlat (kayıt yedeklenir)', 'Start a new game (your save is backed up)')}</button>` : ''}</div></div>`;
+  $('#bootRetry').onclick = () => location.reload();
+  const nb = $('#bootNew');
+  if (nb) nb.onclick = () => { try { const s = readSave(); if (s) localStorage.setItem(SAVE_KEY + '-yedek', s); } catch (x) { /* yok say */ } deleteSave(); G = null; BOOTED = true; renderSetup(); };
+}
+window.addEventListener('error', ev => { if (!BOOTED) bootError(ev.error || ev.message); });
+function boot() {
+  try {
+    if (loadGame()) {
+      if (G.over) renderGameOver();
+      else { afterLoad(); startGameUI(); }
+    } else renderSetup();
+    BOOTED = true; window.BOOT_OK = true;
+  } catch (e) { bootError(e); }
+}
 window.addEventListener('load', () => {
   startIconObserver();
   applyStaticText();
@@ -824,10 +851,12 @@ window.addEventListener('load', () => {
   window.addEventListener('resize', () => {
     checkRotate();
   });
-  if (loadGame()) {
-    if (G.over) renderGameOver();
-    else { afterLoad(); startGameUI(); }
-  } else renderSetup();
+  const bm = document.querySelector('.boot-msg');
+  if (bm) bm.textContent = readSave() ? L('Dünya yükleniyor…', 'Loading the world…') : L('Yükleniyor…', 'Loading…');
+  // Bir betik çözümlenemediyse açılmaya çalışma, hatayı göster
+  if (window.__bootErr && window.__bootErr.length) { bootError(window.__bootErr.join('\n')); return; }
+  // Yükleme ekranı önce çizilsin, sonra ağır iş (dünya haritası) başlasın
+  setTimeout(boot, 50);
   requestAnimationFrame(loop);
   // Uygulama olarak kuruluysa: her açılışta yeni sürümü kontrol et, yeni sürüm gelince bir kez sessizce yenile
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
@@ -836,6 +865,7 @@ window.addEventListener('load', () => {
     let reloaded = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (!hadCtrl || reloaded || UI.screen === 'game' && (G && G.turnLeft > 0)) return;
+      if (!BOOTED) return; // açılış sürerken yenileme döngüsüne girme
       reloaded = true; saveGame && G && saveGame(); location.reload();
     });
   }

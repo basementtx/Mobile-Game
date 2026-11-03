@@ -10,6 +10,17 @@
 let PROV = [];          // { id, x, y, poly:[[x,y]..], nb:[{to,cost,sea}], sett: yerleşim sırası|-1, seat: bağlı yerleşim sırası|-1, dir }
 let PROV_EDGES = [];    // { a, b, x1, y1, x2, y2 } — iki il arasındaki sınır parçaları
 let _provHash = null;
+/* Sayısal dizinli ızgara: "x,y" dize anahtarlı Map'ten çok daha hızlı (dünya haritası için şart) */
+function cellGrid() {
+  const w = Math.ceil(MAP.W / PROV_CELL) + 1, h = Math.ceil(MAP.H / PROV_CELL) + 1, a = new Array(w * h);
+  return {
+    get: (gx, gy) => (gx < 0 || gy < 0 || gx >= w || gy >= h ? undefined : a[gx * h + gy]),
+    add(x, y, v) {
+      const gx = Math.min(w - 1, Math.max(0, Math.floor(x / PROV_CELL))), gy = Math.min(h - 1, Math.max(0, Math.floor(y / PROV_CELL)));
+      const i = gx * h + gy; (a[i] || (a[i] = [])).push(v);
+    },
+  };
+}
 const PROV_CELL = 2;
 
 function mulberry32(a) {
@@ -50,14 +61,14 @@ function buildProvinces() {
   const settXY = SETTLEMENTS.map(([, lon, lat]) => proj(lon, lat));
   settXY.forEach(([x, y], i) => seeds.push({ x, y, sett: i }));
   // 2) Kırsal tohumlar: kara hücrelerine rastgele sırayla "dart" at
-  const hash = new Map();
+  const hash = cellGrid();
   const hk = (x, y) => Math.floor(x / PROV_CELL) + ',' + Math.floor(y / PROV_CELL);
-  const addHash = (s, i) => { const k = hk(s.x, s.y); let a = hash.get(k); if (!a) hash.set(k, a = []); a.push(i); };
+  const addHash = (s, i) => hash.add(s.x, s.y, i);
   seeds.forEach(addHash);
   const near = (x, y, r) => {
     const gx = Math.floor(x / PROV_CELL), gy = Math.floor(y / PROV_CELL), R = Math.ceil(r / PROV_CELL);
     for (let i = -R; i <= R; i++) for (let j = -R; j <= R; j++) {
-      const a = hash.get((gx + i) + ',' + (gy + j)); if (!a) continue;
+      const a = hash.get(gx + i, gy + j); if (!a) continue;
       for (const k of a) { const s = seeds[k]; if ((s.x - x) ** 2 + (s.y - y) ** 2 < r * r) return true; }
     }
     return false;
@@ -87,7 +98,7 @@ function buildProvinces() {
     const cand = [];
     const gx = Math.floor(s.x / PROV_CELL), gy = Math.floor(s.y / PROV_CELL), R = Math.ceil(14 / PROV_CELL);
     for (let a = -R; a <= R; a++) for (let b = -R; b <= R; b++) {
-      const arr = hash.get((gx + a) + ',' + (gy + b)); if (!arr) continue;
+      const arr = hash.get(gx + a, gy + b); if (!arr) continue;
       for (const k of arr) if (k !== i) cand.push([k, (seeds[k].x - s.x) ** 2 + (seeds[k].y - s.y) ** 2]);
     }
     cand.sort((a, b) => a[1] - b[1]);
@@ -138,7 +149,7 @@ function buildProvinces() {
       for (let R = 1; R <= 60 && !(best && (R - 1) * PROV_CELL > Math.sqrt(bd)); R++) {
         for (let a = -R; a <= R; a++) for (let b = -R; b <= R; b++) {
           if (Math.max(Math.abs(a), Math.abs(b)) !== R) continue;
-          const arr = hash.get((gx + a) + ',' + (gy + b)); if (!arr) continue;
+          const arr = hash.get(gx + a, gy + b); if (!arr) continue;
           for (const k of arr) { if (comp[k] === small) continue; const d = (PROV[i].x - PROV[k].x) ** 2 + (PROV[i].y - PROV[k].y) ** 2; if (d < bd) { bd = d; best = [i, k]; } }
         }
       }
@@ -170,8 +181,8 @@ function buildProvinces() {
   // 7) Düz Voronoi kenarlarını doğal, girintili çıkıntılı sınırlara çevir
   roughenBorders();
   // 8) Hızlı arama için ızgara
-  _provHash = new Map();
-  for (const pv of PROV) { const k = hk(pv.x, pv.y); let a = _provHash.get(k); if (!a) _provHash.set(k, a = []); a.push(pv.id); }
+  _provHash = cellGrid();
+  for (const pv of PROV) _provHash.add(pv.x, pv.y, pv.id);
 }
 
 /* Kenarı ara noktalarla kır (orta nokta kaydırma): gerçek sınırlara benzeyen kıvrımlı çizgi.
@@ -246,7 +257,7 @@ function provinceAt(x, y) {
   let best = null, bd = Infinity;
   for (let R = 1; R <= 6 && !best; R += 2) {
     for (let i = -R; i <= R; i++) for (let j = -R; j <= R; j++) {
-      const a = _provHash.get((gx + i) + ',' + (gy + j)); if (!a) continue;
+      const a = _provHash.get(gx + i, gy + j); if (!a) continue;
       for (const k of a) { const p = PROV[k], d = (p.x - x) ** 2 + (p.y - y) ** 2; if (d < bd) { bd = d; best = p; } }
     }
   }
