@@ -199,9 +199,37 @@ function greeting(t, p) {
   else if (p.lordId === t.id) bank = o < -10 ? REL_GREET.liegeSoguk : REL_GREET.liege;
   else if (t.lordId === p.id && t.titles.length) bank = o < -10 ? REL_GREET.vassalSoguk : REL_GREET.vassal;
   let s = pickLine(bank, v);
-  const tail = VOICE_TAIL[voiceOf(t)];
-  if (tail.length && chance(0.45)) s += ' ' + pickLine(tail, v);
+  const mem = memoryRemark(t, p, v);
+  if (mem) s += ' ' + mem;
+  else { const tail = VOICE_TAIL[voiceOf(t)]; if (tail.length && chance(0.45)) s += ' ' + pickLine(tail, v); }
   return s;
+}
+
+/* Seninle ilgili en güçlü anısını dile getirir */
+const MEM_REMARK = {
+  hediye: [T2('Gönderdiğin hediyeyi hâlâ yanımda taşıyorum.', 'I still keep the gift you gave me close.'), T2('Hediyeni unutmadım; çok düşünceliydi.', 'I have not forgotten your gift; it was most thoughtful.')],
+  kotuHediye: [T2('Geçen seferki hediyen... neyse, boş ver.', 'Your last gift... well, never mind.')],
+  ovgu: [T2('Beni başkalarının yanında övdüğünü duydum. Sağ ol.', 'I heard you praised me before others. Thank you.')],
+  kotuleme: [T2('Arkamdan konuştuğunu biliyorum, unutma.', 'I know you spoke behind my back. Do not forget that.'), T2('Dilini benim hakkımda sivriltmişsin, öyle mi?', 'You have been sharpening your tongue on me, have you?')],
+  sirIfsa: [T2('Sırrımı yaydın. Bunu sana asla bağışlamayacağım.', 'You spread my secret. I will never forgive you that.')],
+  hakaret: [T2('Hakaretlerin hâlâ kulaklarımda.', 'Your insults still ring in my ears.')],
+  etkinlik: [T2('Geçen sefer birlikte ne güzel vakit geçirmiştik!', 'What a fine time we had together last time!')],
+  iltifat: [T2('Tatlı dilin yine mi benim için?', 'Is your sweet tongue for me again?')],
+  yalan: [T2('Bana yalan söylediğin günü unutmadım.', 'I have not forgotten the day you lied to me.')],
+  ozur: [T2('Özrünü kabul etmiştim; umarım pişman olmam.', 'I accepted your apology; I hope I will not regret it.')],
+  flort: [T2('Eşimle ne işin vardı senin, söyler misin?', 'What business did you have with my spouse, tell me?')],
+  yardim: [T2('Zor günümde bana yardım ettin. Borcumu unutmam.', 'You helped me in my hour of need. I do not forget my debts.')],
+  savunma: [T2('Beni savunduğunu duydum. Bu nadir bir şey.', 'I heard you defended me. That is a rare thing.')],
+  ihanet: [T2('Bana ihanet ettin. Seni bir daha sırtımı dönmem.', 'You betrayed me. I will not turn my back to you again.')],
+  sozBozma: [T2('Sözünü tutmadın. Borcunu hâlâ bekliyorum.', 'You did not keep your word. I am still waiting for my money.')],
+  soz: [T2('Sözünün eri olduğunu gösterdin.', 'You proved a person of your word.')],
+  ortakSir: [T2('Aramızdakini kimseye söylemedim, merak etme.', 'I have told no one of what is between us, fear not.')],
+};
+function memoryRemark(t, p, v) {
+  const ms = (t.mem || []).filter(m => m.w === p.id && Math.abs(m.v) >= 6 && MEM_REMARK[m.t]);
+  if (!ms.length || !chance(0.7)) return '';
+  ms.sort((a, b) => Math.abs(b.v) - Math.abs(a.v));
+  return pickLine(MEM_REMARK[ms[0].t], v);
 }
 
 /* ---------- Konuşma kaydı ---------- */
@@ -1057,7 +1085,7 @@ function renderDialogue() {
   const title = { small: L('Hal hatır', 'Small talk'), interests: L('İlgi alanları', 'Interests'), gift: L('Hediye', 'Gift'), invite: L('Etkinlik', 'Activity'), people: L('Kimin hakkında?', 'About whom?'), person: DLG.x ? esc(nm(ch(DLG.x))) : '', compliment: L('İltifat', 'Compliment'), flirt: L('Flört', 'Flirt'), request: L('Rica ve teklifler', 'Requests & proposals'), hostile: L('Sertleş', 'Get tough') }[DLG.view] || L('Ne söyleyeceksin?', 'What will you say?');
   showModal(`<div class="dlg">
     <div class="dlg-who">
-      <div class="dlg-face">${avatar(t, 72)}<div><h2>${esc(nm(t))}</h2><p class="small muted">${esc(titleOf(t))} · ${t.age} ${L('yaş', 'yrs')}</p></div></div>
+      <div class="dlg-face">${avatar(t, 72, o / 100)}<div><h2>${esc(nm(t))}</h2><p class="small muted">${esc(titleOf(t))} · ${t.age} ${L('yaş', 'yrs')}</p></div></div>
       <div class="tags">${rel}</div>
       <div class="dlg-meter"><span>${L('Sana bakışı', 'Opinion')}</span>${opBadge(o)}<span class="op ${mcls}">${mood}</span></div>
       <div class="dlg-meter"><span>${L('Sabır', 'Patience')}</span><span class="pips">${'<i class="on"></i>'.repeat(Math.max(0, DLG.pat))}${'<i></i>'.repeat(Math.max(0, DLG.max - DLG.pat))}</span></div>

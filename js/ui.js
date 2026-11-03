@@ -69,9 +69,10 @@ function drawIcon(ctx, name, x, y, size, color, outline) {
 
 /* ---------- Ortak parçalar ---------- */
 function hue(str) { let h = 0; for (const c of str) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
-function avatar(c, size = 40) {
+function avatar(c, size = 40, mood) {
+  const md = mood != null ? mood : (G && c.alive && c.id !== G.playerId && P() ? opinion(c, P()) / 100 : 0.2);
   return `<div class="av${c.alive ? '' : ' dead'}" style="width:${size}px;height:${size}px;--h:${hue(c.dyn)};font-size:${Math.round(size * 0.42)}px">
-    <span>${esc(c.name[0])}</span><i>${c.age < 16 ? '🍼' : RANK_ICON[c.rank]}</i></div>`;
+    ${portrait(c, md)}<i>${c.age < 16 ? '🍼' : RANK_ICON[c.rank]}</i></div>`;
 }
 function opBadge(v) {
   const cls = v >= 40 ? 'pos2' : v > 0 ? 'pos' : v <= -40 ? 'neg2' : v < 0 ? 'neg' : 'neu';
@@ -233,8 +234,10 @@ function updateHUD() {
       <span class="apd" title="${L('Bu ayki entrika hakkı', 'Intrigue actions this month')}">${'<i class="on"></i>'.repeat(G.ap)}${'<i></i>'.repeat(Math.max(0, AP_MAX - G.ap))}</span>
     </div>`)) $('#hudL .who').onclick = () => openSheet(P().id);
   if (setHTML($('#hudR'), `<span class="date"><b>${(G.day % 30) + 1} ${monthName(G.month)} ${G.year}</b><small>${L('Tur', 'Turn')} ${G.turn || 1}</small></span>
+    <button id="mmBtn" class="mm" title="${L('Harita modu', 'Map mode')}">🗺️<small>${mapModeName(UI.mapMode || 'siyasi')}</small></button>
     <button id="spd" title="${L('Tur hızı', 'Turn speed')}">${UI.speed === 1 ? '▶' : UI.speed === 2 ? '▶▶' : '▶▶▶'}</button>
     <button id="menuBtn" title="${L('Menü', 'Menu')}">☰</button>`)) {
+    $('#mmBtn').onclick = cycleMapMode;
     $('#spd').onclick = () => { UI.speed = UI.speed === 1 ? 2 : UI.speed === 2 ? 4 : 1; updateHUD(); };
     $('#menuBtn').onclick = openMenu;
   }

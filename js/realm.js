@@ -407,6 +407,7 @@ function doCoup(p) {
 /* ---------- Aylık krallık işleyişi ---------- */
 function realmMonth() {
   settlementMonth();
+  if (typeof UI !== 'undefined' && UI.mapMode && UI.mapMode !== 'siyasi') G.terrDirty = true;
   npcBuildTick();
   loanTick();
   const p = P();

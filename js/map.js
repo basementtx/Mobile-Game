@@ -51,10 +51,48 @@ function provOwnerKey(pv) {
   if (s.liege && G.titles[s.liege] && !G.titles[s.liege].dead) return s.liege;
   return s.holder != null ? 'h' + s.holder : 'wild';
 }
+/* ---------- Harita modları ---------- */
+const MAP_MODES = ['siyasi', 'huzur', 'refah', 'diplomasi'];
+function mapModeName(m) { return { siyasi: L('Siyasi', 'Political'), huzur: L('Huzursuzluk', 'Unrest'), refah: L('Refah', 'Prosperity'), diplomasi: L('Diplomasi', 'Diplomacy') }[m]; }
+function mapModeLegend(m) {
+  return { siyasi: '', huzur: L('yeşil: huzurlu · sarı: tedirgin · kırmızı: isyan eşiğinde', 'green: calm · yellow: uneasy · red: near revolt'), refah: L('koyu: yoksul · altın: zengin', 'dark: poor · gold: rich'),
+    diplomasi: L('altın: senin · sarı: krallığın · mavi: müttefik · kırmızı: düşman · yeşil→gri→kızıl: hükümdarın sana bakışı', 'gold: yours · amber: your realm · blue: ally · red: enemy · green→grey→rust: ruler\'s opinion of you') }[m];
+}
+function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function rampColor(t, stops) {
+  t = Math.round(clamp(t, 0, 1) * 8) / 8;
+  const x = t * (stops.length - 1), i = Math.min(stops.length - 2, Math.floor(x)), f = x - i;
+  const a = hexToRgb(stops[i]), b = hexToRgb(stops[i + 1]);
+  return `rgb(${Math.round(a[0] + (b[0] - a[0]) * f)},${Math.round(a[1] + (b[1] - a[1]) * f)},${Math.round(a[2] + (b[2] - a[2]) * f)})`;
+}
+function modeColor(pv, k, mode) {
+  if (k === 'wild') return null;
+  if (mode === 'siyasi') return G.titles[k] ? G.titles[k].color : '#9a9080';
+  const s = provSettlement(pv);
+  if (!s) return null;
+  if (mode === 'huzur') return rampColor((s.unrest || 0) / 90, ['#3f7a34', '#c9b23a', '#b0302a']);
+  if (mode === 'refah') return rampColor(((s.prosperity || 1) - 0.5) / 0.9, ['#3e3326', '#8a7a3a', '#f0c85a']);
+  const p = P(), pr = realmOf(p), r = s.liege ? G.titles[s.liege] : null;
+  if (s.holder === p.id) return '#f2c440';
+  if (!r || r.dead) return '#6e6a62';
+  if (pr && r === pr) return '#b98a32';
+  if (atWarRealms(r, pr) || hostileChars(p, ch(s.holder))) return '#b0302a';
+  if (allied(r, pr)) return '#3f8fc0';
+  const k2 = ch(r.holder);
+  return k2 ? rampColor((opinion(k2, p) + 100) / 200, ['#8a3a30', '#6e6a62', '#3f8a44']) : '#6e6a62';
+}
 function buildTerritory() {
   const keys = PROV.map(provOwnerKey);
-  TERR = { keys, col: keys.map(k => (k === 'wild' ? null : G.titles[k] ? G.titles[k].color : '#9a9080')) };
+  const mode = UI.mapMode || 'siyasi';
+  TERR = { keys, col: PROV.map((pv, i) => modeColor(pv, keys[i], mode)) };
   G.terrDirty = false;
+}
+function cycleMapMode() {
+  const i = MAP_MODES.indexOf(UI.mapMode || 'siyasi');
+  UI.mapMode = MAP_MODES[(i + 1) % MAP_MODES.length];
+  G.terrDirty = true; MAPDIRTY = true;
+  toast(`🗺️ <b>${mapModeName(UI.mapMode)}</b>${mapModeLegend(UI.mapMode) ? '<br><small>' + mapModeLegend(UI.mapMode) + '</small>' : ''}`);
+  updateHUD();
 }
 
 /* ---------- Koordinat dönüşümü ---------- */

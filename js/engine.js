@@ -624,7 +624,7 @@ function npcAct(c) {
       if (c.gold < 30) break;
       t = choose(near.filter(x => opinion(c, x) < (x === p ? -60 : -50)), x => -opinion(c, x));
       if (!t) break;
-      if (t === p) { if (!chance(p.dread / 100) && chance(0.6)) playerAssassinAttempt(c); }
+      if (t === p) { if (!chance(p.dread / 100) && chance(G.guardUntil > monthIndex() ? 0.2 : 0.6)) playerAssassinAttempt(c); }
       else tryMurder(c, t);
       break;
     case 'duello':
@@ -898,6 +898,7 @@ function monthTick() {
   rumorTick();
   G.ap = AP_MAX;
   G.monthsPlayed++;
+  if (!G.over && typeof audienceTick === 'function') audienceTick();
   if (!G.over) randomEventTick();
 }
 
