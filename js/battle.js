@@ -89,6 +89,7 @@ function rollWeather(lat) {
 /* o: { A: oyuncu ordusu, enemy: {troops, leaderId, name}, siege: yerleşim|null, onEnd(sonuç) } */
 function startBattle(o) {
   const p = P(), lc = o.enemy.leaderId != null ? ch(o.enemy.leaderId) : null;
+  const cmd = armyLeader(o.A);
   const er = lc ? realmOf(lc) : o.siege && o.siege.liege ? G.titles[o.siege.liege] : null;
   const pv = partyProv(o.A);
   const lat = pv ? MAP.LAT1 - pv.y : 45;
@@ -99,7 +100,7 @@ function startBattle(o) {
   };
   BT = {
     o, round: 0, phase: 'deploy', over: false, result: null, log: [], fx: null,
-    A: side(o.A.troops, p, nm(p), '#e8b84a', false),
+    A: side(o.A.troops, cmd, armyName(o.A) + (cmd ? ' · ' + nm(cmd) : ''), '#e8b84a', false), cmd,
     E: side(o.enemy.troops, lc, o.enemy.name, er ? er.color : '#8a8070', true),
     place: o.siege ? o.siege.name : provName(pv),
     terrain: o.siege ? 'sur' : terrainAt(pv), weather: rollWeather(lat), max: o.siege ? 12 : 10,
@@ -160,8 +161,8 @@ function enemyOrder() {
 }
 function intelAccuracy() {
   if (BT.weather === 'sis') return 0;
-  const p = P();
-  return clamp(0.3 + (stat(p, 'ent') + stat(p, 'sav')) / 50 + councilBonus('casus') * 0.02, 0, 0.9);
+  const c = BT.cmd;
+  return clamp(0.25 + (c ? stat(c, 'sav') : 4) / 30 + councilBonus('casus') * 0.025, 0, 0.9);
 }
 function prepareRound() {
   BT.eNext = enemyOrder();
@@ -172,7 +173,7 @@ function prepareRound() {
   } else BT.intel = null;
   // Komutan düellosu
   BT.duel = null;
-  if (!BT.o.siege && BT.E.lead && BT.round >= 1 && !BT.duelDone && chance(0.13) && P().health > 30) BT.duel = BT.E.lead.id;
+  if (!BT.o.siege && BT.E.lead && BT.round >= 1 && !BT.duelDone && chance(0.13) && BT.cmd && free(BT.cmd) && BT.cmd.health > 30) BT.duel = BT.E.lead.id;
 }
 
 /* ---------- Bir turun çözümü ---------- */
@@ -249,7 +250,7 @@ function resolveRound(ta) {
   }
   // Komutan riski
   let wounded = false;
-  if ((ta === 'ileri') && chance(XA.risk || 0.1)) { wounded = true; P().health -= 15; notes.push(L('Sancağı taşırken yaralandın! (Sağlık -15)', 'You were wounded carrying the banner! (Health -15)')); }
+  if ((ta === 'ileri') && BT.cmd && chance(XA.risk || 0.1)) { wounded = true; BT.cmd.health -= 15; notes.push(L(`${esc(BT.cmd.name)} sancağı taşırken yaralandı! (Sağlık -15)`, `${esc(BT.cmd.name)} was wounded carrying the banner! (Health -15)`)); }
   if (XA.morale) A.morale += XA.morale;
   if (!siege && XE.morale) E.morale += XE.morale;
   // Hasar: kanat kanat
@@ -315,7 +316,7 @@ function checkEnd() {
     if (BT.o.siege) return finishBattle(false, false);
     return finishBattle(troopPower(A.troops) * (A.morale + 20) >= troopPower(E.troops) * (E.morale + 20), false);
   }
-  if (P().health <= 0) return finishBattle(false, false);
+  if (BT.cmd && BT.cmd.health <= 0) return finishBattle(false, false);
   return false;
 }
 function finishBattle(won, retreated) {
@@ -329,7 +330,7 @@ function finishBattle(won, retreated) {
   }
   A.troops = sideTroops(A); E.troops = sideTroops(E);
   const loss = s => { const out = {}; for (const k in s.init) { const d = s.init[k] - (s.troops[k] || 0); if (d > 0) out[k] = d; } return out; };
-  const heroDown = !won && !retreated && chance(0.35);
+  const heroDown = !won && !retreated && !!BT.cmd && chance(0.35);
   const leaderDown = won && !!E.lead && (BT.duelWon || chance(0.35));
   BT.result = { won, retreated: !!retreated, lossA: loss(A), lossB: loss(E), heroDown, leaderDown };
   BT.log.push(retreated ? L('Geri çekilme borusu çaldı.', 'You sound the retreat.')
@@ -364,17 +365,17 @@ function beginFight() {
   renderBattle();
 }
 function duelChoice(accept) {
-  const p = P(), c = BT.E.lead;
+  const p = BT.cmd, c = BT.E.lead;
   BT.duelDone = true; BT.duel = null;
-  if (!accept) { BT.A.morale = Math.max(0, BT.A.morale - 8); BT.log.push(L(`${esc(c.name)}'in meydan okumasını geri çevirdin. Askerlerin arasında homurtular yükseldi.`, `You refused ${esc(c.name)}'s challenge. Your soldiers mutter.`)); renderBattle(); return; }
+  if (!accept || !p) { BT.A.morale = Math.max(0, BT.A.morale - 8); BT.log.push(L(`${esc(c.name)}'in meydan okumasını geri çevirdin. Askerlerin arasında homurtular yükseldi.`, `You refused ${esc(c.name)}'s challenge. Your soldiers mutter.`)); renderBattle(); return; }
   const win = chance(duelChance(p, c) / 100);
   if (win) {
     BT.E.morale = Math.max(0, BT.E.morale - 30); BT.A.morale = Math.min(100, BT.A.morale + 12); p.prestige += 25; BT.duelWon = true;
-    BT.log.push(L(`⚔️ İki ordunun arasında çelik çeliğe çarptı... <b class="good">${esc(c.name)}'i atından düşürdün!</b> Düşman safları sarsıldı.`, `⚔️ Between the two armies steel rang on steel... <b class="good">you unhorsed ${esc(c.name)}!</b> The enemy ranks waver.`));
+    BT.log.push(L(`⚔️ İki ordunun arasında çelik çeliğe çarptı... <b class="good">${esc(p.name)}, ${esc(c.name)}'i atından düşürdü!</b> Düşman safları sarsıldı.`, `⚔️ Between the two armies steel rang on steel... <b class="good">${esc(p.name)} unhorsed ${esc(c.name)}!</b> The enemy ranks waver.`));
     if (chance(0.25)) { die(c, L(`Savaş meydanında ${nm(p)} ile teke tek dövüşte öldü`, `Slain by ${nm(p)} in single combat`)); BT.E.lead = null; BT.log.push(L('Düşman komutanı aldığı darbeyle can verdi!', 'The enemy commander died of the blow!')); }
   } else {
     p.health -= 25; BT.A.morale = Math.max(0, BT.A.morale - 20); BT.E.morale = Math.min(100, BT.E.morale + 10);
-    BT.log.push(L(`⚔️ ${esc(c.name)}'in kılıcı kalkanını parçaladı. <b class="bad">Yaralı hâlde saflarına döndün.</b> (Sağlık -25)`, `⚔️ ${esc(c.name)}'s blade shattered your shield. <b class="bad">You returned to your lines wounded.</b> (Health -25)`));
+    BT.log.push(L(`⚔️ ${esc(c.name)}'in kılıcı kalkanını parçaladı. <b class="bad">${esc(p.name)} yaralı hâlde saflara döndü.</b> (Sağlık -25)`, `⚔️ ${esc(c.name)}'s blade shattered the shield of ${esc(p.name)}. <b class="bad">Your commander returned to the lines wounded.</b> (Health -25)`));
   }
   if (!checkEnd()) renderBattle();
 }
@@ -539,7 +540,7 @@ function renderBattle() {
       <div class="brow"><button class="opt primary" data-begin>${siege ? L('🔥 Hücuma geç', '🔥 Begin the assault') : L('⚔️ Savaşa başla', '⚔️ Begin the battle')}</button><button class="opt" data-retreat>🏳️ ${L('Çekil', 'Withdraw')}</button></div>`;
   } else if (BT.phase === 'order' && BT.duel) {
     const c = ch(BT.duel);
-    foot = `<div class="bduel"><b>⚔️ ${L('Meydan okuma!', 'A challenge!')}</b><p>${L(`Düşman komutanı <b>${esc(nm(c))}</b> iki ordunun arasına çıktı ve seni teke tek dövüşe çağırıyor! (Kazanma şansın ~%${duelChance(P(), c)})`, `The enemy commander <b>${esc(nm(c))}</b> rides out between the armies and challenges you to single combat! (Your chance ~${duelChance(P(), c)}%)`)}</p>
+    foot = `<div class="bduel"><b>⚔️ ${L('Meydan okuma!', 'A challenge!')}</b><p>${L(`Düşman komutanı <b>${esc(nm(c))}</b> iki ordunun arasına çıktı ve komutanın <b>${esc(nm(BT.cmd))}</b>'i teke tek dövüşe çağırıyor! (Kazanma şansı ~%${duelChance(BT.cmd, c)})`, `The enemy commander <b>${esc(nm(c))}</b> rides out between the armies and challenges your commander <b>${esc(nm(BT.cmd))}</b> to single combat! (Chance ~${duelChance(BT.cmd, c)}%)`)}</p>
       <div class="brow"><button class="opt primary" data-duel="1">🤺 ${L('Kabul et', 'Accept')}</button><button class="opt" data-duel="0">${L('Reddet (moral -8)', 'Refuse (morale -8)')}</button></div></div>`;
   } else if (BT.phase === 'order') {
     const set = siege ? Object.keys(SIEGE_T) : Object.keys(TACTICS);
@@ -551,7 +552,7 @@ function renderBattle() {
   else {
     const head = r.retreated ? `<b class="mid">🏳️ ${L('Geri çekildin', 'You retreated')}</b>` : r.won ? `<b class="good">🏆 ${L('Zafer!', 'Victory!')}</b>` : `<b class="bad">💀 ${L('Yenilgi', 'Defeat')}</b>`;
     foot = `<div class="bres">${head}<span>${L('Kayıpların', 'Your losses')}: ${lossText(r.lossA)} · ${L('Düşman kayıpları', 'Enemy losses')}: ${lossText(r.lossB)}</span>
-      ${r.heroDown ? `<span class="bad">${L('Ağır yaralandın. (Sağlık -35)', 'You were badly wounded. (Health -35)')}</span>` : ''}${(BT.notes || []).map(x => `<span>${x}</span>`).join('')}</div>
+      ${r.heroDown && BT.cmd ? `<span class="bad">${L(`Komutanın ${esc(BT.cmd.name)} ağır yaralandı.`, `Your commander ${esc(BT.cmd.name)} was badly wounded.`)}</span>` : ''}${(BT.notes || []).map(x => `<span>${x}</span>`).join('')}</div>
       <div class="brow"><button class="opt primary" data-bclose>${L('Devam', 'Continue')}</button></div>`;
   }
   panel.innerHTML = `<div class="bhd"><h2>${title}</h2><div class="bconds">${conds}</div></div>

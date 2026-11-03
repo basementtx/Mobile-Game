@@ -5,7 +5,8 @@
    ========================================================= */
 
 let G = null;
-const SAVE_KEY = 'tac-ve-hancer-v2';
+const SAVE_KEY = 'tac-ve-hancer-v3';
+const OLD_SAVE_KEY = 'tac-ve-hancer-v2'; // eski sürüm: yalnızca hükümdar olarak oynanan kayıtlar taşınır
 const AP_MAX = 3;
 const LEVY = [0, 1, 15, 100, 220, 400];
 
@@ -907,12 +908,23 @@ function monthTick() {
 function saveGame() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) { /* kayıt yapılamadı */ }
 }
-function loadGame() {
+/* Kayıt metni: yeni anahtar, yoksa eski kayıt (oyuncu bir krallığın hükümdarıysa) */
+function readSave() {
   try {
     const s = localStorage.getItem(SAVE_KEY);
+    if (s) return s;
+    const o = localStorage.getItem(OLD_SAVE_KEY);
+    if (!o) return null;
+    const g = JSON.parse(o), pc = g && g.chars && g.chars[g.playerId];
+    return pc && pc.alive && pc.titles.some(id => g.titles[id] && g.titles[id].kind === 'realm') ? o : null;
+  } catch (e) { return null; }
+}
+function loadGame() {
+  try {
+    const s = readSave();
     if (!s) return false;
     G = JSON.parse(s);
     return !!(G && G.chars && G.playerId);
   } catch (e) { return false; }
 }
-function deleteSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* yok say */ } }
+function deleteSave() { try { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(OLD_SAVE_KEY); } catch (e) { /* yok say */ } }

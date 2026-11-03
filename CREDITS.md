@@ -11,3 +11,5 @@ Icons from [game-icons.net](https://game-icons.net), licensed under [CC BY 3.0](
 - **zeromancer**: heart-plus
 
 Map data: Natural Earth (public domain).
+
+Flags and coats of arms (js/flags.js) are original SVG drawings based on historical heraldry of c. 1180; some charges reuse the game-icons.net paths listed above.
