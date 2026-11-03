@@ -23,7 +23,6 @@ const KINKS = biEach({
 const KINK_KEYS = Object.keys(KINKS);
 const ROLE_NAMES = { dom: BL('Hükmeden', 'Dominant'), sub: BL('Teslim olan', 'Submissive'), switch: BL('İkisi de', 'Switch'), none: BL('Geleneksel', 'Conventional') };
 const ORI_NAMES = { het: BL('Karşı cinse ilgi', 'Heterosexual'), hom: BL('Hemcinsine ilgi', 'Homosexual'), bi: BL('İki cinse de ilgi', 'Bisexual') };
-const ROLEPLAYS = [BL('efendi ile hizmetkâr', 'lord and servant'), BL('kervancı ile hancı', 'caravaneer and innkeeper'), BL('şövalye ile hanımefendi', 'knight and lady'), BL('korsan ile tüccar', 'corsair and merchant'), BL('yabancı elçi ile saray muhafızı', 'foreign envoy and palace guard')];
 
 /* Karakterin mahrem özellikleri (ilk ihtiyaçta üretilir, kayda girer) */
 function sexOf(c) {
@@ -138,22 +137,48 @@ function showNightResult(t, res) {
 }
 
 /* ---------- Gecenin sonucu ---------- */
-const NIGHT_TEXT = {
-  sefkat: [BL('Mum ışığında, acele etmeden… Sabaha dek birbirinize sarılı uyudunuz.', 'By candlelight, unhurried… You slept in each other\'s arms until dawn.'), BL('Nazik olmaya çalıştın ama aranızdaki soğukluk erimedi.', 'You tried to be gentle, but the chill between you never thawed.')],
-  tutku: [BL('Kapı daha kapanmadan dudaklarınız buluştu. Gece uzun, nefes nefese ve unutulmazdı.', 'Your lips met before the door had closed. The night was long, breathless, unforgettable.'), BL('Fazla aceleciydin; {t} geri çekildi.', 'You were too hasty; {t} pulled away.')],
-  hakim: [BL('Sen emrettin, {t} itaat etti — ve bundan aldığı zevki hiç saklamadı.', 'You commanded and {t} obeyed — making no secret of enjoying it.'), BL('{t} emir almaktan hoşlanmadı. Gece buz gibi bitti.', '{t} did not care to take orders. The night ended cold as ice.')],
-  teslim: [BL('Bu gece kontrol {t}\'deydi. Kendini bırakmak tuhaf bir özgürlüktü.', 'Tonight {t} held control. Letting go was a strange kind of freedom.'), BL('{t} dizginleri almak istemedi; ikiniz de ne yapacağınızı bilemediniz.', '{t} did not want the reins; neither of you knew what to do.')],
-  bag: [BL('İpek kurdeleler, sıkı düğümler ve fısıldanan bir güvenli söz… Güven, en güçlü bağdı.', 'Silk ribbons, tight knots and a whispered safe word… Trust was the strongest bond of all.'), BL('Düğümleri görünce {t}\'in yüzü değişti. "Hayır," dedi, kesin bir sesle. Hemen çözdün.', 'Seeing the knots, {t}\'s face changed. "No," they said firmly. You untied them at once.')],
-  sert: [BL('Acıyla hazzın arasındaki ince çizgide dans ettiniz; ertesi sabah ikiniz de gülümsüyordunuz.', 'You danced on the thin line between pain and pleasure; next morning you were both smiling.'), BL('{t} canı yandığında gülmedi, irkildi. Hemen durdunuz ama büyü bozulmuştu.', 'When it hurt, {t} did not laugh but flinched. You stopped at once, but the spell was broken.')],
-  rol: [BL('Bu gece ikiniz de başka biriydiniz — {rol}. Kahkahalar ve fısıltılar sabaha dek sürdü.', 'Tonight you were both someone else — {rol}. Laughter and whispers lasted until dawn.'), BL('{t} oyuna giremedi; replikler havada kaldı.', '{t} could not get into the game; the lines fell flat.')],
-  kostum: [BL('Bir maske, ödünç bir pelerin… Tanıdık bir yüzü yeniden keşfetmek ne heyecanlıydı.', 'A mask, a borrowed cloak… How thrilling to discover a familiar face anew.'), BL('Kostümü görünce {t} gülmeye başladı — ama seninle değil, sana.', 'Seeing the costume, {t} burst out laughing — not with you, but at you.')],
-  yag: [BL('Gül ve sandal yağlarının kokusu odayı doldurdu. Her kas gevşedi, her dert unutuldu.', 'The scent of rose and sandalwood filled the room. Every muscle loosened, every care forgotten.'), BL('Yağ fazla, sabır azdı; {t} sıkılıp uykuya daldı.', 'Too much oil, too little patience; {t} grew bored and fell asleep.')],
-  teshir: [BL('Yakalanma korkusu her dokunuşu ateşe verdi. Kalbiniz hâlâ çarpıyor.', 'The fear of being caught set every touch aflame. Your hearts are still racing.'), BL('{t} her sesten irkildi; tadını çıkaramadı.', '{t} started at every sound and could not enjoy it.')],
-};
-const NIGHT_MID = [BL('Fena bir gece değildi; ama ikiniz de aklınızda başka şeylerle uykuya daldınız.', 'It was not a bad night; but you both fell asleep with other things on your minds.'), BL('{t} gülümsedi, sen de gülümsedin. Belki bir dahaki sefere daha iyi olur.', '{t} smiled, and so did you. Perhaps next time will be better.'), BL('Sessiz, biraz çekingen bir gece. Birbirinizi henüz tam tanımıyorsunuz.', 'A quiet, somewhat shy night. You do not quite know each other yet.')];
+/* ---------- Metinler (js/nighttext.js) ---------- */
+const nightStr = e => (typeof e === 'string' ? e : e && typeof e === 'object' ? (L(e.tr, e.en) || e.tr || e.en || '') : '');
+/* Koşullara uyan metinlerden rastgele birini seç; koşulu tutanları tercih et */
+function pickNight(list, tags) {
+  if (!Array.isArray(list) || !list.length) return null;
+  const ok = list.filter(e => { const k = e && typeof e === 'object' ? e.kosul : null; if (!k) return true; return (Array.isArray(k) ? k : [k]).every(x => tags.includes(x)); });
+  const special = ok.filter(e => e && typeof e === 'object' && e.kosul);
+  const pool = special.length && chance(0.75) ? special : ok;
+  return pool.length ? nightStr(pick(pool)) : null;
+}
+const NIGHT_TIERS = ['kotu', 'orta', 'iyi', 'unutulmaz'];
+function nightTags(p, t, wasPartner) {
+  const tags = [];
+  if (p.spouseId === t.id) tags.push('es');
+  else if (wasPartner) tags.push('sevgili');
+  if (!wasPartner) tags.push('ilk');
+  if (closeKin(p, t)) tags.push('akraba');
+  const r = sexOf(t).role;
+  if (r === 'dom' || r === 'switch') tags.push('dom');
+  if (r === 'sub' || r === 'switch') tags.push('sub');
+  return tags;
+}
+function fillNight(str, p, t) {
+  const NT = typeof NIGHT_TEXTS !== 'undefined' ? NIGHT_TEXTS : {};
+  const rol = pickNight(NT.rol_senaryolari, []) || L('efendi ile hizmetkâr', 'lord and servant');
+  return String(str).replace(/\{t\}/g, esc(t.name)).replace(/\{tam\}/g, esc(nm(t))).replace(/\{sen\}/g, esc(p.name)).replace(/\{rol\}/g, rol).replace(/\n/g, '<br>');
+}
+/* Gecenin metni: yaklaşım → genel → bir alt derece, sırayla aranır */
+function nightLine(k, tier, tags) {
+  const NT = typeof NIGHT_TEXTS !== 'undefined' ? NIGHT_TEXTS : {};
+  const tries = [];
+  for (let d = tier; d >= 0 && tries.length < 6; d--) {
+    const n = NIGHT_TIERS[d];
+    if (d < tier && (tier >= 2) !== (d >= 2)) break; // iyi geceye kötü metin düşmesin
+    tries.push([NT[k], n], [NT.genel, n]);
+  }
+  for (const [o, n] of tries) { const s = o ? pickNight(o[n], tags) : null; if (s) return s; }
+  return tier >= 2 ? L('Güzel bir geceydi.', 'It was a fine night.') : tier === 1 ? L('Sıradan bir geceydi.', 'An ordinary night.') : L('Gece kötü geçti.', 'The night went badly.');
+}
 function spendNight(p, t, k, childMode) {
   G.ap -= 1;
-  const v = s => s.replace(/\{t\}/g, esc(t.name)).replace(/\{rol\}/g, pickB(pick(ROLEPLAYS)));
+  const tags = nightTags(p, t, isPartner(p, t));
   const fx = [], wasPartner = isPartner(p, t), sp = sexOf(p), st = sexOf(t);
   const out = { fx, title: '', text: '', log: '' };
   // Kabul
@@ -164,7 +189,7 @@ function spendNight(p, t, k, childMode) {
     if (spouse && spouse.alive && (has(t, 'durust') || has(t, 'iffetli') || chance(0.3))) { addRumor(p, t, spouse, 'flort', 0.4); fx.push([L(`${esc(spouse.name)} bunu duyabilir…`, `${esc(spouse.name)} may hear of this…`), 'bad']); }
     if (chance(0.35)) { p.shame += 4; fx.push([L('Saray dedikodusu: rezalet +4', 'Court gossip: shame +4'), 'bad']); }
     out.title = L('Reddedildin', 'Refused');
-    out.text = pickB(pick([BL(`${esc(t.name)} elini nazikçe çekti: "Hayır. Bunu unutalım."`, `${esc(t.name)} gently withdrew their hand: "No. Let us forget this."`), BL(`${esc(t.name)} soğuk bir bakışla kapıyı gösterdi.`, `${esc(t.name)} pointed at the door with a cold look.`)]));
+    out.text = fillNight(pickNight((typeof NIGHT_TEXTS !== 'undefined' ? NIGHT_TEXTS : {}).ret, tags) || L('{t} davetini reddetti.', '{t} turned you down.'), p, t);
     out.log = L(`🌹 ${nm(t)} davetini reddetti.`, `🌹 ${nm(t)} refused your invitation.`);
     return out;
   }
@@ -177,7 +202,7 @@ function spendNight(p, t, k, childMode) {
   const tier = score >= 85 ? 3 : score >= 60 ? 2 : score >= 35 ? 1 : 0;
   knowPref(t, 'x', k);
   if (roleFit) knowPref(t, 'x', 'role');
-  out.text = tier >= 2 ? v(pickB(NIGHT_TEXT[k][0])) : tier === 0 ? v(pickB(NIGHT_TEXT[k][1])) : v(pickB(pick(NIGHT_MID)));
+  out.text = fillNight(nightLine(k, tier, tags), p, t);
   out.title = [L('Soğuk bir gece', 'A cold night'), L('Sıradan bir gece', 'An ordinary night'), L('Güzel bir gece', 'A fine night'), L('Unutulmaz bir gece', 'An unforgettable night')][tier];
   const dOp = [like < 0 ? -22 : -10, 3, 10, 20][tier], dSt = [6, -4, -12, -20][tier];
   addOp(t, p, dOp); stress(p, dSt);
