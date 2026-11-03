@@ -71,7 +71,7 @@ function buildProvinces() {
     let dS = 1e9;
     for (const [sx, sy] of settXY) { const d = (sx - x) ** 2 + (sy - y) ** 2; if (d < dS) dS = d; }
     dS = Math.sqrt(dS);
-    const r = dS < 4 ? 1.15 : dS < 7 ? 1.7 : 2.5;
+    const r = dS < 4 ? 1.15 : dS < 7 ? 1.7 : dS < 14 ? 2.5 : 3.6;
     if (dS < 0.95 || near(x, y, r)) continue;
     seeds.push({ x, y, sett: -1 });
     addHash(seeds[seeds.length - 1], seeds.length - 1);
@@ -118,8 +118,8 @@ function buildProvinces() {
       else if (d < 3.2) { addNb(pv.id, j, 2, true); addNb(j, pv.id, 2, true); }
     }
   }
-  // 5) Bağlantısız adaları en yakın ile deniz yoluyla bağla
-  for (let guard = 0; guard < 60; guard++) {
+  // 5) Bağlantısız adaları ve kıtaları en yakın ile deniz yoluyla bağla (ızgarayla hızlı en yakın arama)
+  for (let guard = 0; guard < 2000; guard++) {
     const comp = new Int32Array(N).fill(-1);
     let nc = 0;
     for (let i = 0; i < N; i++) {
@@ -134,14 +134,18 @@ function buildProvinces() {
     let best = null, bd = 1e9;
     for (let i = 0; i < N; i++) {
       if (comp[i] !== small) continue;
-      for (let k = 0; k < N; k++) {
-        if (comp[k] === small) continue;
-        const d = (PROV[i].x - PROV[k].x) ** 2 + (PROV[i].y - PROV[k].y) ** 2;
-        if (d < bd) { bd = d; best = [i, k]; }
+      const gx = Math.floor(PROV[i].x / PROV_CELL), gy = Math.floor(PROV[i].y / PROV_CELL);
+      for (let R = 1; R <= 60 && !(best && (R - 1) * PROV_CELL > Math.sqrt(bd)); R++) {
+        for (let a = -R; a <= R; a++) for (let b = -R; b <= R; b++) {
+          if (Math.max(Math.abs(a), Math.abs(b)) !== R) continue;
+          const arr = hash.get((gx + a) + ',' + (gy + b)); if (!arr) continue;
+          for (const k of arr) { if (comp[k] === small) continue; const d = (PROV[i].x - PROV[k].x) ** 2 + (PROV[i].y - PROV[k].y) ** 2; if (d < bd) { bd = d; best = [i, k]; } }
+        }
       }
     }
     if (!best) break;
-    addNb(best[0], best[1], 2, true); addNb(best[1], best[0], 2, true);
+    const cost = Math.max(2, Math.round(Math.sqrt(bd) / 1.6));
+    addNb(best[0], best[1], cost, true); addNb(best[1], best[0], cost, true);
   }
   // 6) Kırsal illeri, karadan en yakın yerleşime bağla (Dijkstra, en fazla 5.5 birim)
   const dist_ = new Float64Array(N).fill(Infinity);
@@ -254,10 +258,21 @@ function provName(pv) {
   if (!pv) return '';
   if (pv.sett >= 0) return settName(SETTLEMENTS[pv.sett][0]);
   if (pv.seat >= 0) return L(`${pickB(DIRS[pv.dir])} ${settName(SETTLEMENTS[pv.seat][0])}`, `${pickB(DIRS[pv.dir])} ${settName(SETTLEMENTS[pv.seat][0])}`);
-  const lat = MAP.LAT1 - pv.y, lon = pv.x / MAP.COS + MAP.LON0;
-  if (lat < 31) return L('Çöl', 'Desert');
-  if (lat > 59) return L('Tayga', 'Taiga');
-  if (lon > 33 && lat > 45) return L('Bozkır', 'Steppe');
+  return wildName(pv);
+}
+/* Sahipsiz illere iklime ve bölgeye göre ad ver */
+function wildName(pv) {
+  const lat = MAP.LAT1 - pv.y, lon = pv.x / MAP.COS + MAP.LON0, al = Math.abs(lat);
+  const inBox = (a, b, c, d) => lon >= a && lon <= b && lat >= c && lat <= d;
+  if (al > 66) return L('Tundra', 'Tundra');
+  if (inBox(-17, 35, 15, 33) || inBox(35, 60, 15, 31) || inBox(115, 145, -32, -18) || inBox(-75, -68, -28, -16) || inBox(-118, -105, 26, 36)) return L('Çöl', 'Desert');
+  if (inBox(90, 118, 38, 48)) return L('Gobi', 'Gobi');
+  if (al > 55) return L('Tayga', 'Taiga');
+  if (inBox(30, 120, 44, 55)) return L('Bozkır', 'Steppe');
+  if (inBox(-110, -90, 35, 52)) return L('Çayırlar', 'Prairie');
+  if (inBox(-66, -55, -48, -30)) return L('Pampa', 'Pampas');
+  if (al < 12) return L('Yağmur ormanı', 'Rainforest');
+  if (al < 23) return L('Savan', 'Savanna');
   return L('Sahipsiz topraklar', 'Wilderness');
 }
 /* İlin bağlı olduğu yerleşim (title nesnesi) ya da null */

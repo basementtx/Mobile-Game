@@ -72,8 +72,8 @@ const ACTIONS = [
   },
   {
     id: 'bastan', get ad() { return L('Baştan çıkar', 'Seduce'); }, icon: '🌹', ap: 1, tgt: true,
-    show: (p, t) => isAdult(p) && isAdult(t) && !closeKin(p, t) && !p.lovers.includes(t.id) && p.spouseId !== t.id,
-    req: (p, t) => jailReq(p, t),
+    show: (p, t) => isGrown(p) && isGrown(t) && !closeKin(p, t) && !p.lovers.includes(t.id) && p.spouseId !== t.id,
+    req: (p, t) => firstReq(jailReq(p, t), t.prisonerOf ? L('Esaret altında rıza olmaz', 'No consent in captivity') : null, !attracted(t, p) ? L('Sana o gözle bakmıyor', 'Not drawn to you that way') : null),
     chance: (p, t) => seduceChance(p, t),
     run(p, t) {
       if (chance(seduceChance(p, t) / 100)) {

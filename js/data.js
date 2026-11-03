@@ -58,6 +58,7 @@ const TRAITS = biEach({
   yarali: { ad: BL('Yaralı', 'Scarred'), st: { sav: -1, cek: -1 }, d: BL('Bedeninde derin yara izleri taşıyor.', 'Bears deep scars.') },
   akrabakatili: { ad: BL('Akraba Katili', 'Kinslayer'), st: {}, d: BL('Kendi kanını döktüğü herkesçe bilinir. Herkes ondan iğrenir.', 'Known to have spilled their own blood. Everyone despises them.') },
   dindar: { ad: BL('Dindar', 'Pious'), st: { dip: 1 }, d: BL('Tanrı korkusu taşır.', 'God-fearing.') },
+  frengi: { ad: BL('Frengi', 'The Great Pox'), st: { cek: -2, sav: -1 }, d: BL('Utanç verici bir hastalık. Sağlığı kemirir, sevgililere ve eşe bulaşır. Şifahane iyileştirebilir.', 'A shameful disease. It gnaws at health and spreads to lovers and spouse. A hospital can cure it.') },
 });
 const PERSONALITY = Object.keys(TRAITS).filter(k => TRAITS[k].kisilik);
 const PHYSICAL = Object.keys(TRAITS).filter(k => TRAITS[k].fiziksel);
@@ -108,6 +109,78 @@ const CULTURES = biEach({
     f: ['Ingrid', 'Astrid', 'Sigrid', 'Ragnhild', 'Gunhild', 'Helga', 'Kristin', 'Margrete', 'Thora', 'Sofia'],
     d: ['Hvide', 'Bjelbo', 'Gille', 'Folkung', 'Galen', 'Stenkil', 'Hardrada', 'Skjalm', 'Bjarkøy', 'Giske'],
   },
+  cin: {
+    ad: BL('Çin', 'Chinese'), east: false, fam: true,
+    m: ['Kuo', 'Gou', 'Shen', 'Dun', 'Kuang', 'Yin', 'Zhen', 'Xu', 'Hong', 'Wei', 'Jie', 'Tao', 'Yan', 'Shun', 'Ming', 'Hui', 'Liang', 'Qian', 'Rui', 'Feng', 'Bao', 'Cheng', 'Guang', 'Hao', 'Jin', 'Kai', 'Lin', 'Wen', 'Yue', 'Zhong'],
+    f: ['Mei', 'Lian', 'Xiu', 'Hua', 'Ying', 'Yu', 'Fang', 'Jing', 'Lan', 'Qing', 'Rong', 'Shu', 'Ting', 'Xia', 'Zhen', 'Hui', 'Ling', 'Yue', 'Zhu', 'Qingzhao'],
+    d: ['Zhao', 'Wang', 'Li', 'Zhang', 'Liu', 'Chen', 'Yang', 'Huang', 'Zhou', 'Wu', 'Xu', 'Sun', 'Ma', 'Zhu', 'Hu', 'Guo', 'He', 'Han', 'Lin', 'Luo', 'Yue', 'Xin'],
+  },
+  japon: {
+    ad: BL('Japon', 'Japanese'), east: false, fam: true,
+    m: ['Kiyomori', 'Yoritomo', 'Yoshitsune', 'Munemori', 'Shigemori', 'Tomomori', 'Noriyori', 'Yoshinaka', 'Tadanori', 'Koremori', 'Atsumori', 'Kagetoki', 'Nobuyori', 'Tsunemasa', 'Tokimasa', 'Yoshitomo', 'Shigetada', 'Benkei', 'Yorimasa', 'Kanezane'],
+    f: ['Tokiko', 'Masako', 'Tomoe', 'Shizuka', 'Akiko', 'Teishi', 'Sadako', 'Fujiko', 'Kiyoko', 'Michiko', 'Yasuko', 'Noriko', 'Haruko', 'Tokuko', 'Giō'],
+    d: ['Taira', 'Minamoto', 'Fujiwara', 'Hōjō', 'Ōe', 'Tachibana', 'Sasaki', 'Miura', 'Chiba', 'Kajiwara', 'Hatakeyama', 'Kumagai'],
+  },
+  kore: {
+    ad: BL('Kore', 'Korean'), east: false, fam: true,
+    m: ['Jung-bu', 'Ui-bang', 'Gyeong-seung', 'Ui-min', 'Chung-heon', 'Bu-sik', 'Tae-jun', 'Seung-u', 'Jae-won', 'Hyeon', 'Mu', 'Jun', 'Seok', 'Hwan', 'Gyu', 'Dong-hyeon'],
+    f: ['Hye-won', 'Seo-yeon', 'Min-ji', 'Su-bin', 'Ji-woo', 'Ha-eun', 'Yu-na', 'Eun-ji', 'Da-eun', 'So-yeon'],
+    d: ['Wang', 'Choe', 'Kim', 'Yi', 'Jeong', 'Park', 'Gyeong', 'Han', 'Yun', 'Kang'],
+  },
+  hint: {
+    ad: BL('Hint', 'Indian'), east: false,
+    m: ['Prithviraj', 'Jayachandra', 'Kulottunga', 'Rajaraja', 'Vijayachandra', 'Govindachandra', 'Someshvara', 'Vira', 'Ballala', 'Narasimha', 'Bhima', 'Lakshmana', 'Vikrama', 'Ajaya', 'Arnoraja', 'Hammira', 'Madana', 'Kirti', 'Harsha', 'Chandra'],
+    f: ['Samyukta', 'Karpuradevi', 'Rajasundari', 'Kundavai', 'Lilavati', 'Padmavati', 'Ratnavali', 'Chandralekha', 'Devaladevi', 'Sita', 'Uma', 'Lakshmi', 'Kamala', 'Rupavati'],
+    d: ['Chahamana', 'Gahadavala', 'Chola', 'Chalukya', 'Hoysala', 'Yadava', 'Paramara', 'Sena', 'Kakatiya', 'Pandya', 'Chandela', 'Solanki'],
+  },
+  khmer: {
+    ad: BL('Güneydoğu Asya', 'Southeast Asian'), east: false,
+    m: ['Jayavarman', 'Yasovarman', 'Suryavarman', 'Dharanindra', 'Tribhuvanaditya', 'Narapatisithu', 'Sithu', 'Kyansittha', 'Alaungsithu', 'Anawrahta', 'Indravarman', 'Rudravarman', 'Udayaditya', 'Kesavarman', 'Balaputra'],
+    f: ['Jayarajadevi', 'Indradevi', 'Rajendradevi', 'Shwe', 'Thiri', 'Saw', 'Indrani', 'Chandra', 'Sri Devi', 'Kamboja'],
+    d: ['Mahidharapura', 'Varman', 'Pagan', 'Sailendra', 'Udaya', 'Kaundinya', 'Pyu', 'Mon', 'Malayu', 'Lavo'],
+  },
+  viet: {
+    ad: BL('Viet', 'Vietnamese'), east: false, fam: true,
+    m: ['Long Cán', 'Hiến Thành', 'An Di', 'Thủ Độ', 'Thừa', 'Quang', 'Khánh', 'Dũng', 'Tuấn', 'Bảo', 'Minh', 'Hùng', 'Nhân', 'Phúc', 'Thượng'],
+    f: ['Chiêu Hoàng', 'Thị Dung', 'Thị Lan', 'Thị Mai', 'Ngọc', 'Thị Hằng', 'Thị Yến', 'Thị Thu', 'Thị Hạnh', 'Thị Hoa'],
+    d: ['Lý', 'Trần', 'Đỗ', 'Tô', 'Nguyễn', 'Lê', 'Phạm', 'Đinh', 'Hoàng', 'Vũ'],
+  },
+  mogol: {
+    ad: BL('Moğol', 'Mongol'), east: true,
+    m: ['Temüjin', 'Toghrul', 'Jamukha', 'Yesügei', 'Jochi', 'Ögedei', 'Tolui', 'Subutai', 'Jebe', 'Muqali', 'Bo\'orchu', 'Belgutei', 'Qasar', 'Senggum', 'Tayang', 'Kuchlug', 'Altan', 'Qutula', 'Yelü Dashi', 'Zhilugu'],
+    f: ['Börte', 'Hoelun', 'Sorghaghtani', 'Yesui', 'Yesugen', 'Khulan', 'Alaqai', 'Checheyigen', 'Töregene', 'Pusuwan'],
+    d: ['Borjigin', 'Kerait', 'Naiman', 'Merkit', 'Tatar', 'Ongud', 'Jadaran', 'Kiyat', 'Yelü', 'Khongirad'],
+  },
+  fars: {
+    ad: BL('Fars', 'Persian'), east: true,
+    m: ['Gıyaseddin', 'Muhammed', 'Behram', 'Alaeddin', 'Seyfeddin', 'Hüseyin', 'Kutbeddin', 'Mahmud', 'Şehabeddin', 'Fahreddin', 'Rükneddin', 'Nasıreddin', 'Celaleddin', 'Kemaleddin', 'Ferruh'],
+    f: ['Şirin', 'Gülnar', 'Ferengis', 'Roşen', 'Mahin', 'Peri', 'Nesrin', 'Zerrin', 'Gülbanu', 'Hürrem'],
+    d: ['Şansabani', 'Gurî', 'Samanî', 'Gaznevî', 'Bavendî', 'Herevî', 'Belhî', 'Tusî', 'Kirmanî', 'Isfahanî'],
+  },
+  habes: {
+    ad: BL('Habeş ve Nubya', 'Ethiopian & Nubian'), east: false,
+    m: ['Lalibela', 'Yemrehana', 'Harbay', 'Naakueto', 'Gebre Meskel', 'Yitbarek', 'Tatadim', 'Mose', 'Giyorgis', 'Dawit', 'Zekarias', 'Merkurios', 'Kiryakos', 'Selomon', 'Basil'],
+    f: ['Meskel Kibra', 'Mariam', 'Tsion', 'Eleni', 'Marta', 'Seble', 'Tirsit', 'Asta', 'Mantasha', 'Aster'],
+    d: ['Zagwe', 'Lasta', 'Makuria', 'Dongola', 'Wag', 'Amhara', 'Agaw', 'Nobadia', 'Alodia', 'Tigray'],
+  },
+  afrika: {
+    ad: BL('Sahel', 'Sahelian'), east: false,
+    m: ['Sundiata', 'Soumaoro', 'Kaya', 'Dunama', 'Biri', 'Abdallah', 'Salmama', 'Hume', 'Tunka', 'Manan', 'Bassi', 'Faran', 'Kankou', 'Bakary', 'Mamadi', 'Fakoli'],
+    f: ['Sogolon', 'Nana', 'Kassa', 'Sassouma', 'Djeneba', 'Fanta', 'Aïssata', 'Hawa', 'Kadiatou', 'Nana Triban'],
+    d: ['Sayfawa', 'Duguwa', 'Cissé', 'Kanté', 'Keita', 'Touré', 'Traoré', 'Diarra', 'Sylla', 'Koné'],
+  },
+  and: {
+    ad: BL('And', 'Andean'), east: false,
+    m: ['Tacaynamo', 'Guacricaur', 'Ñancen Pinco', 'Minchancaman', 'Cuntipallec', 'Pacatnamu', 'Naymlap', 'Cium', 'Fempellec', 'Lapon', 'Llimpa', 'Xam'],
+    f: ['Ceterni', 'Ñofan', 'Fongasigde', 'Ochocalo', 'Tecfi', 'Cumña', 'Llapchi', 'Sian'],
+    d: ['Chimor', 'Lambayeque', 'Sicán', 'Moche', 'Naymlap', 'Huanchaco', 'Pacatnamu', 'Collique'],
+  },
+  mezo: {
+    ad: BL('Mezoamerika', 'Mesoamerican'), east: false,
+    m: ['Topiltzin', 'Huemac', 'Mixcoatl', 'Tezcatl', 'Chimalpopoca', 'Acamapichtli', 'Xolotl', 'Tlotzin', 'Huetzin', 'Itzcoatl', 'Cuauhtli', 'Ocelotl', 'Tochtli', 'Kukulkan'],
+    f: ['Xochitl', 'Chimalma', 'Citlali', 'Itzel', 'Malinalli', 'Tonalli', 'Atzi', 'Quiahuitl', 'Nenetl', 'Ixchel'],
+    d: ['Tollan', 'Culhua', 'Chichimeca', 'Acolhua', 'Tepanec', 'Mixtec', 'Cocom', 'Xiu', 'Itza', 'Toltec'],
+  },
 });
 
 /* ---------- Asker tipleri ---------- */
@@ -150,6 +223,30 @@ const REALMS = biEach({
   eyyubi: { ad: BL('Eyyubi Sultanlığı', 'Ayyubid Sultanate'), kisa: BL('Eyyubi', 'Ayyubids'), kul: 'arap', renk: '#d08a2a', u: [BL('Sultan', 'Sultan'), BL('Sultan', 'Sultana')], han: 'Ayyubid' },
   abbasi: { ad: BL('Abbasi Halifeliği', 'Abbasid Caliphate'), kisa: BL('Abbasi', 'Abbasids'), kul: 'arap', renk: '#4a5f9a', u: [BL('Halife', 'Caliph'), BL('Halife', 'Caliph')], han: 'Abbasid' },
   muvahhid: { ad: BL('Muvahhid Halifeliği', 'Almohad Caliphate'), kisa: BL('Muvahhid', 'Almohads'), kul: 'arap', renk: '#3d8a45', u: [BL('Halife', 'Caliph'), BL('Halife', 'Caliph')], han: 'Mumini' },
+  // --- Dünyanın geri kalanı (1180) ---
+  kipcak: { ad: BL('Kıpçak Konfederasyonu', 'Cuman-Kipchak Confederation'), kisa: BL('Kıpçaklar', 'Cumans'), kul: 'turk', renk: '#6aa0b8', u: [BL('Han', 'Khan'), BL('Hatun', 'Khatun')], han: 'Burçoğlu' },
+  harezm: { ad: BL('Harezmşahlar Devleti', 'Khwarazmian Empire'), kisa: BL('Harezm', 'Khwarazm'), kul: 'turk', renk: '#9a4f2a', u: [BL('Şah', 'Shah'), BL('Melike', 'Malika')], han: 'Anuştegin' },
+  karahitay: { ad: BL('Kara Hıtay Hanlığı', 'Qara Khitai'), kisa: BL('Kara Hıtay', 'Qara Khitai'), kul: 'mogol', renk: '#5b5ea6', u: [BL('Gürhan', 'Gurkhan'), BL('Gürhan', 'Gurkhan')], han: 'Yelü' },
+  kerait: { ad: BL('Kerait Hanlığı', 'Keraite Khanate'), kisa: BL('Keraitler', 'Keraites'), kul: 'mogol', renk: '#8fae7a', u: [BL('Han', 'Khan'), BL('Hatun', 'Khatun')], han: 'Kerait' },
+  gur: { ad: BL('Gur Sultanlığı', 'Ghurid Sultanate'), kisa: BL('Gurlular', 'Ghurids'), kul: 'fars', renk: '#2f6e4e', u: [BL('Sultan', 'Sultan'), BL('Sultan', 'Sultana')], han: 'Şansabani' },
+  chahamana: { ad: BL('Çahamana Krallığı', 'Chahamanas of Shakambhari'), kisa: BL('Çahamana', 'Chahamanas'), kul: 'hint', renk: '#a8433a', u: [BL('Mihrace', 'Maharaja'), BL('Mihrani', 'Maharani')], han: 'Chahamana' },
+  gahadavala: { ad: BL('Gahadavala Krallığı', 'Gahadavala Kingdom'), kisa: BL('Gahadavala', 'Gahadavalas'), kul: 'hint', renk: '#e3a33a', u: [BL('Mihrace', 'Maharaja'), BL('Mihrani', 'Maharani')], han: 'Gahadavala' },
+  chola: { ad: BL('Çola İmparatorluğu', 'Chola Empire'), kisa: BL('Çola', 'Cholas'), kul: 'hint', renk: '#3b7d3a', u: [BL('Mihrace', 'Maharaja'), BL('Mihrani', 'Maharani')], han: 'Chola' },
+  xia: { ad: BL('Batı Xia İmparatorluğu', 'Western Xia'), kisa: BL('Batı Xia', 'Western Xia'), kul: 'cin', renk: '#8c6d46', u: [BL('İmparator', 'Emperor'), BL('İmparatoriçe', 'Empress')], han: 'Weiming' },
+  jin: { ad: BL('Jin Hanedanı', 'Jin Dynasty'), kisa: BL('Jin', 'Jin'), kul: 'cin', renk: '#c9a227', u: [BL('İmparator', 'Emperor'), BL('İmparatoriçe', 'Empress')], han: 'Wanyan' },
+  song: { ad: BL('Güney Song Hanedanı', 'Southern Song Dynasty'), kisa: BL('Song', 'Song'), kul: 'cin', renk: '#c2453b', u: [BL('İmparator', 'Emperor'), BL('İmparatoriçe', 'Empress')], han: 'Zhao' },
+  goryeo: { ad: BL('Goryeo Krallığı', 'Kingdom of Goryeo'), kisa: BL('Goryeo', 'Goryeo'), kul: 'kore', renk: '#3d6fa8', u: KING, han: 'Wang' },
+  japon: { ad: BL('Japonya İmparatorluk Sarayı', 'Imperial Court of Japan'), kisa: BL('Japonya', 'Japan'), kul: 'japon', renk: '#b03a48', u: [BL('Tennō', 'Tennō'), BL('Tennō', 'Tennō')], han: 'Yamato' },
+  daiviet: { ad: BL('Đại Việt Krallığı', 'Đại Việt'), kisa: BL('Đại Việt', 'Đại Việt'), kul: 'viet', renk: '#d4a017', u: [BL('İmparator', 'Emperor'), BL('İmparatoriçe', 'Empress')], han: 'Lý' },
+  khmer: { ad: BL('Khmer İmparatorluğu', 'Khmer Empire'), kisa: BL('Khmer', 'Khmer'), kul: 'khmer', renk: '#7b4fa0', u: KING, han: 'Mahidharapura' },
+  pagan: { ad: BL('Pagan Krallığı', 'Kingdom of Pagan'), kisa: BL('Pagan', 'Pagan'), kul: 'khmer', renk: '#a35d2a', u: KING, han: 'Pagan' },
+  srivijaya: { ad: BL('Srivijaya', 'Srivijaya'), kisa: BL('Srivijaya', 'Srivijaya'), kul: 'khmer', renk: '#2d8a8a', u: [BL('Mihrace', 'Maharaja'), BL('Mihrani', 'Maharani')], han: 'Sailendra' },
+  mukurra: { ad: BL('Makurya Krallığı', 'Kingdom of Makuria'), kisa: BL('Makurya', 'Makuria'), kul: 'habes', renk: '#4a6fa5', u: KING, han: 'Dongola' },
+  zagwe: { ad: BL('Zagwe Hanedanı (Habeşistan)', 'Zagwe Ethiopia'), kisa: BL('Habeşistan', 'Ethiopia'), kul: 'habes', renk: '#2e7d32', u: [BL('Necaşi', 'Negus'), BL('Necaşi', 'Negiste')], han: 'Zagwe' },
+  kanem: { ad: BL('Kanem İmparatorluğu', 'Kanem Empire'), kisa: BL('Kanem', 'Kanem'), kul: 'afrika', renk: '#7a9a2e', u: [BL('Mai', 'Mai'), BL('Magira', 'Magira')], han: 'Sayfawa' },
+  gana: { ad: BL('Gana İmparatorluğu', 'Ghana Empire'), kisa: BL('Gana', 'Ghana'), kul: 'afrika', renk: '#c79a2c', u: [BL('Tunka', 'Tunka'), BL('Tunka', 'Tunka')], han: 'Cissé' },
+  chimu: { ad: BL('Chimor Krallığı', 'Kingdom of Chimor'), kisa: BL('Chimú', 'Chimú'), kul: 'and', renk: '#b5651d', u: [BL('Cie Quich', 'Cie Quich'), BL('Cie Quich', 'Cie Quich')], han: 'Chimor' },
+  tolteka: { ad: BL('Tolteklerin Tollan\'ı', 'Toltec Tollan'), kisa: BL('Toltekler', 'Toltecs'), kul: 'mezo', renk: '#3f8f6b', u: [BL('Tlatoani', 'Tlatoani'), BL('Cihuatlatoani', 'Cihuatlatoani')], han: 'Tollan' },
 });
 
 /* Yerleşimler: [ad, boylam, enlem, tip, krallık, başkent?] — tip: sehir | kale */
@@ -190,15 +287,42 @@ const SETTLEMENTS = [
   ['Halep', 37.16, 36.2, 'sehir', 'eyyubi'], ['Asvan', 32.9, 24.09, 'kale', 'eyyubi'], ['Mekke', 39.83, 21.42, 'sehir', 'eyyubi'], ['Medine', 39.6, 24.47, 'kale', 'eyyubi'],
   ['Bağdat', 44.36, 33.31, 'sehir', 'abbasi', 1], ['Basra', 47.78, 30.51, 'sehir', 'abbasi'], ['Musul', 43.13, 36.34, 'sehir', 'abbasi'],
   ['Hemedan', 48.51, 34.8, 'sehir', 'irak', 1], ['İsfahan', 51.67, 32.65, 'sehir', 'irak'], ['Rey', 51.43, 35.6, 'kale', 'irak'], ['Tebriz', 46.29, 38.08, 'sehir', 'irak'],
+  // --- Dünyanın geri kalanı ---
+  ['Şarukan', 36.25, 49.99, 'kale', 'kipcak', 1], ['Suğdak', 34.97, 44.85, 'sehir', 'kipcak'], ['Sarkel', 42.1, 47.6, 'kale', 'kipcak'],
+  ['Gürgenç', 59.15, 42.33, 'sehir', 'harezm', 1], ['Hive', 60.36, 41.38, 'kale', 'harezm'], ['Merv', 61.83, 37.6, 'sehir', 'harezm'], ['Nişabur', 58.8, 36.21, 'sehir', 'harezm'],
+  ['Balasagun', 75.25, 42.75, 'sehir', 'karahitay', 1], ['Kaşgar', 75.99, 39.47, 'sehir', 'karahitay'], ['Semerkant', 66.96, 39.65, 'sehir', 'karahitay'], ['Buhara', 64.42, 39.77, 'sehir', 'karahitay'], ['Hotan', 79.92, 37.11, 'kale', 'karahitay'],
+  ['Tula Ordası', 106.9, 47.9, 'kale', 'kerait', 1], ['Ötüken', 102.0, 47.5, 'kale', 'kerait'],
+  ['Firuzkuh', 64.53, 34.4, 'kale', 'gur', 1], ['Gazne', 68.42, 33.55, 'sehir', 'gur'], ['Herat', 62.2, 34.35, 'sehir', 'gur'], ['Belh', 66.9, 36.76, 'sehir', 'gur'], ['Lahor', 74.34, 31.55, 'sehir', 'gur'],
+  ['Ajmer', 74.64, 26.45, 'kale', 'chahamana', 1], ['Delhi', 77.21, 28.66, 'sehir', 'chahamana'],
+  ['Kannauj', 79.92, 27.05, 'sehir', 'gahadavala', 1], ['Varanasi', 82.97, 25.32, 'sehir', 'gahadavala'],
+  ['Gangaikonda', 79.45, 11.21, 'sehir', 'chola', 1], ['Thanjavur', 79.14, 10.79, 'sehir', 'chola'], ['Kanchipuram', 79.7, 12.83, 'sehir', 'chola'], ['Madurai', 78.12, 9.93, 'kale', 'chola'],
+  ['Xingqing', 106.23, 38.49, 'sehir', 'xia', 1], ['Liangzhou', 102.63, 37.93, 'kale', 'xia'], ['Ganzhou', 100.45, 38.93, 'kale', 'xia'], ['Dunhuang', 94.66, 40.14, 'kale', 'xia'],
+  ['Zhongdu', 116.4, 39.9, 'sehir', 'jin', 1], ['Kaifeng', 114.31, 34.8, 'sehir', 'jin'], ['Huining', 126.95, 45.53, 'kale', 'jin'], ['Datong', 113.3, 40.09, 'kale', 'jin'], ['Liaoyang', 123.17, 41.27, 'kale', 'jin'], ['Jingzhao', 108.94, 34.34, 'sehir', 'jin'],
+  ['Linan', 120.16, 30.27, 'sehir', 'song', 1], ['Jiankang', 118.78, 32.06, 'sehir', 'song'], ['Fuzhou', 119.3, 26.08, 'sehir', 'song'], ['Guangzhou', 113.26, 23.13, 'sehir', 'song'],
+  ['Chengdu', 104.07, 30.67, 'sehir', 'song'], ['Jiangling', 112.2, 30.35, 'kale', 'song'], ['Xiangyang', 112.14, 32.04, 'kale', 'song'], ['Quanzhou', 118.59, 24.91, 'sehir', 'song'],
+  ['Kaesong', 126.55, 37.97, 'sehir', 'goryeo', 1], ['Seogyeong', 125.75, 39.03, 'kale', 'goryeo'], ['Gyeongju', 129.21, 35.86, 'kale', 'goryeo'],
+  ['Heian-kyō', 135.77, 35.01, 'sehir', 'japon', 1], ['Fukuhara', 135.18, 34.69, 'sehir', 'japon'], ['Kamakura', 139.55, 35.32, 'kale', 'japon'], ['Dazaifu', 130.52, 33.51, 'kale', 'japon'], ['Hiraizumi', 141.12, 38.99, 'kale', 'japon'],
+  ['Thăng Long', 105.85, 21.03, 'sehir', 'daiviet', 1], ['Thanh Hóa', 105.78, 19.8, 'kale', 'daiviet'],
+  ['Yasodharapura', 103.87, 13.41, 'sehir', 'khmer', 1], ['Phimai', 102.5, 15.22, 'kale', 'khmer'], ['Lavo', 100.62, 14.8, 'kale', 'khmer'],
+  ['Pagan', 94.86, 21.17, 'sehir', 'pagan', 1], ['Thaton', 97.37, 16.92, 'kale', 'pagan'], ['Pegu', 96.48, 17.34, 'kale', 'pagan'],
+  ['Palembang', 104.75, -2.99, 'sehir', 'srivijaya', 1], ['Jambi', 103.6, -1.61, 'kale', 'srivijaya'], ['Kedah', 100.37, 6.12, 'kale', 'srivijaya'],
+  ['Dongola', 30.73, 18.22, 'sehir', 'mukurra', 1], ['Soba', 32.67, 15.52, 'kale', 'mukurra'],
+  ['Roha', 39.05, 12.03, 'kale', 'zagwe', 1], ['Aksum', 38.72, 14.13, 'sehir', 'zagwe'],
+  ['Njimi', 15.3, 14.1, 'kale', 'kanem', 1], ['Bilma', 12.92, 18.69, 'kale', 'kanem'],
+  ['Kumbi Saleh', -7.97, 15.77, 'sehir', 'gana', 1], ['Velata', -7.03, 17.3, 'kale', 'gana'],
+  ['Chan Chan', -79.07, -8.11, 'sehir', 'chimu', 1], ['Batán Grande', -79.75, -6.45, 'kale', 'chimu'],
+  ['Tollan', -99.34, 20.06, 'sehir', 'tolteka', 1], ['Chichén Itzá', -88.57, 20.68, 'sehir', 'tolteka'], ['Culhuacan', -99.1, 19.33, 'kale', 'tolteka'],
 ];
 
 /* Yerleşimlerin İngilizce adları (Türkçe ad -> İngilizce ad) */
-const SETT_EN = {"Londra": "London", "Rouen": "Rouen", "Orléans": "Orléans", "Aachen": "Aachen", "Köln": "Cologne", "Viyana": "Vienna", "Prag": "Prague", "Milano": "Milan", "Lizbon": "Lisbon", "Barselona": "Barcelona", "Marakeş": "Marrakesh", "Sevilla": "Seville", "Kurtuba": "Córdoba", "Gırnata": "Granada", "Fas": "Fez", "Tunus": "Tunis", "Bicaye": "Bougie", "Napoli": "Naples", "Venedik": "Venice", "Estergon": "Esztergom", "Belgrad": "Belgrade", "Varad": "Várad", "Krakov": "Kraków", "Poznan": "Poznań", "Çernigov": "Chernigov", "Konstantinopolis": "Constantinople", "Selanik": "Thessalonica", "Atina": "Athens", "İznik": "Nicaea", "Trabzon": "Trebizond", "Edirne": "Adrianople", "İzmir": "Smyrna", "Antalya": "Attalia", "Lefkoşa": "Nicosia", "Sofya": "Sofia", "Tırnova": "Tarnovo", "Kayseri": "Caesarea", "Sivas": "Sebasteia", "Ankara": "Ankara", "Diyarbakır": "Amid", "Tiflis": "Tbilisi", "Kudüs": "Jerusalem", "Akka": "Acre", "Antakya": "Antioch", "Trablusşam": "Tripoli", "Kahire": "Cairo", "İskenderiye": "Alexandria", "Şam": "Damascus", "Halep": "Aleppo", "Asvan": "Aswan", "Mekke": "Mecca", "Medine": "Medina", "Bağdat": "Baghdad", "Musul": "Mosul", "Hemedan": "Hamadan", "İsfahan": "Isfahan", "Rey": "Rayy", "Tebriz": "Tabriz"};
+const SETT_EN = {"Londra": "London", "Rouen": "Rouen", "Orléans": "Orléans", "Aachen": "Aachen", "Köln": "Cologne", "Viyana": "Vienna", "Prag": "Prague", "Milano": "Milan", "Lizbon": "Lisbon", "Barselona": "Barcelona", "Marakeş": "Marrakesh", "Sevilla": "Seville", "Kurtuba": "Córdoba", "Gırnata": "Granada", "Fas": "Fez", "Tunus": "Tunis", "Bicaye": "Bougie", "Napoli": "Naples", "Venedik": "Venice", "Estergon": "Esztergom", "Belgrad": "Belgrade", "Varad": "Várad", "Krakov": "Kraków", "Poznan": "Poznań", "Çernigov": "Chernigov", "Konstantinopolis": "Constantinople", "Selanik": "Thessalonica", "Atina": "Athens", "İznik": "Nicaea", "Trabzon": "Trebizond", "Edirne": "Adrianople", "İzmir": "Smyrna", "Antalya": "Attalia", "Lefkoşa": "Nicosia", "Sofya": "Sofia", "Tırnova": "Tarnovo", "Kayseri": "Caesarea", "Sivas": "Sebasteia", "Ankara": "Ankara", "Diyarbakır": "Amid", "Tiflis": "Tbilisi", "Kudüs": "Jerusalem", "Akka": "Acre", "Antakya": "Antioch", "Trablusşam": "Tripoli", "Kahire": "Cairo", "İskenderiye": "Alexandria", "Şam": "Damascus", "Halep": "Aleppo", "Asvan": "Aswan", "Mekke": "Mecca", "Medine": "Medina", "Bağdat": "Baghdad", "Musul": "Mosul", "Hemedan": "Hamadan", "İsfahan": "Isfahan", "Rey": "Rayy", "Tebriz": "Tabriz",
+  "Şarukan": "Sharukan", "Suğdak": "Sudak", "Gürgenç": "Gurganj", "Hive": "Khiva", "Nişabur": "Nishapur", "Kaşgar": "Kashgar", "Semerkant": "Samarkand", "Buhara": "Bukhara",
+  "Tula Ordası": "Tuul Ordu", "Ötüken": "Ötüken", "Gazne": "Ghazni", "Belh": "Balkh", "Lahor": "Lahore", "Gangaikonda": "Gangaikonda Cholapuram", "Linan": "Lin'an", "Velata": "Walata"};
 const settName = trName => L(trName, SETT_EN[trName] || trName);
 
 /* ---------- Harita projeksiyonu ----------
    Harita birimi ≈ 1 enlem derecesi (~111 km). x = (boylam - LON0) * cos(40°), y = LAT1 - enlem */
-const MAP = { LON0: -12, LON1: 62, LAT0: 12, LAT1: 66, COS: Math.cos(40 * Math.PI / 180) };
+const MAP = { LON0: -180, LON1: 180, LAT0: -58, LAT1: 80, COS: Math.cos(40 * Math.PI / 180) };
 MAP.W = (MAP.LON1 - MAP.LON0) * MAP.COS;
 MAP.H = MAP.LAT1 - MAP.LAT0;
 function proj(lon, lat) { return [(lon - MAP.LON0) * MAP.COS, MAP.LAT1 - lat]; }

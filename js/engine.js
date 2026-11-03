@@ -76,9 +76,13 @@ function isPrince(c) {
   for (const id of [c.fatherId, c.motherId]) { const x = ch(id); if (x && x.alive && ownRealm(x)) return true; }
   return false;
 }
+/* Doğu Asya kültürlerinde aile adı önce gelir */
+const famFirst = c => !!(c && CULTURES[c.cul] && CULTURES[c.cul].fam);
+function fullName(c) { return famFirst(c) ? `${c.dyn} ${c.name}` : `${c.name} ${c.dyn}`; }
 function nm(c) {
   if (!c) return L('Bilinmeyen biri', 'Someone unknown');
-  if (c.age < 16 || c.rank < 2) return `${c.name} ${c.dyn}`;
+  if (c.age < 16 || c.rank < 2) return fullName(c);
+  if (famFirst(c)) { const r = rankName(c); return c.rank >= 2 && c.rank !== 2 ? `${r} ${c.dyn} ${c.name}` : fullName(c); }
   const r = rankName(c);
   if (c.rank < 5 && isPrince(c)) return isEast(c) && LANG === 'tr' ? `${c.name} ${r}` : `${r} ${c.name}`;
   if (c.rank === 2 && !isEast(c)) return `${c.female ? 'Dame' : L('Sör', 'Sir')} ${c.name} ${c.dyn}`;
@@ -91,6 +95,7 @@ function titleOf(c) {
   if (r) return r.name;
   const ss = settlementsOf(c);
   if (ss.length) return ss.map(t => t.name).slice(0, 3).join(', ') + (ss.length > 3 ? '…' : '');
+  if (c.job && typeof jobName === 'function' && c.age >= 16) return jobName(c);
   return rankName(c);
 }
 function dateStr() { return `${monthName(G.month)} ${G.year}`; }
@@ -153,6 +158,8 @@ function makeChar(o = {}) {
     bonds: {}, mem: [], sup: null,
   };
   c.pr = o.pr || genPrefs(c);
+  if (o.job) c.job = o.job;
+  else if (rank <= 1 && (o.age ?? 30) >= 16 && typeof STREET_JOBS !== 'undefined' && chance(0.55)) c.job = pick(STREET_JOBS);
   G.chars[c.id] = c;
   return c;
 }
@@ -297,6 +304,7 @@ function opinionParts(a, b) {
   if (a.prisonerOf === b.id) parts.push([L('Onu zindanda tutuyor', 'Keeps them imprisoned'), -30]);
   if (typeof prefOpinionParts === 'function') for (const x of prefOpinionParts(a, b)) parts.push(x);
   if (typeof vassalLawParts === 'function') for (const x of vassalLawParts(a, b)) parts.push(x);
+  if (typeof sexOpinionParts === 'function') for (const x of sexOpinionParts(a, b)) parts.push(x);
   return parts;
 }
 function opinion(a, b) { return clamp(opinionParts(a, b).reduce((s, p) => s + p[1], 0), -100, 100); }
@@ -566,7 +574,7 @@ function npcAct(c) {
   const w = (k, v) => { if (v > 0) opts.push([k, v]); };
   w('sohbet', 2);
   w('hediye', has(c, 'comert') ? 2 : 0.5);
-  w('bastan', has(c, 'sehvetli') ? 2.5 : has(c, 'iffetli') ? 0 : 0.4);
+  w('bastan', !isGrown(c) ? 0 : (has(c, 'sehvetli') ? 2.5 : has(c, 'iffetli') ? 0 : 0.4) * (c.sx ? c.sx.lib / 50 : 1));
   if (!c.spouseId && c.age < 55) w('evlen', 2);
   w('iftira', has(c, 'kurnaz') ? 1.5 : 0.3);
   w('suikast', (has(c, 'zalim') || has(c, 'hirsli')) && !has(c, 'merhametli') ? 0.5 : 0.08);
@@ -590,8 +598,8 @@ function npcAct(c) {
       if (t) { c.gold -= 10; t.gold += 10; addOp(t, c, 10); if (t === p) log(L(`🎁 ${nm(c)} sana 10 altınlık bir hediye gönderdi.`, `🎁 ${nm(c)} sent you a gift worth 10 gold.`), 'good'); }
       break;
     case 'bastan': {
-      const cands = near.filter(x => !closeKin(c, x) && !c.lovers.includes(x.id) && x.spouseId !== c.id &&
-        (x.female !== c.female || chance(0.1)) && opinion(c, x) > 10);
+      const cands = near.filter(x => isGrown(x) && !closeKin(c, x) && !c.lovers.includes(x.id) && x.spouseId !== c.id &&
+        attracted(c, x) && attracted(x, c) && opinion(c, x) > 10);
       t = choose(cands, x => opinion(c, x) + (has(x, 'guzel') ? 20 : 0));
       if (!t) break;
       if (t === p) queueEvent('bastanTeklif', { from: c.id });
@@ -794,14 +802,15 @@ function fillVacant() {
 }
 function birthsTick() {
   const all = living();
-  const f = clamp(1.6 - all.length / 120, 0.15, 1.3);
+  const f = clamp(1.6 - all.length / 260, 0.15, 1.3);
   for (const m of all) {
-    if (!m.female || m.age < 16 || m.age > 45 || m.prisonerOf) continue;
+    if (!m.female || m.age < 18 || m.age > 45 || m.prisonerOf || m.preg) continue;
+    // Gebelik dokuz ay sürer (intimacy.js: pregTick doğumu gerçekleştirir)
     const sp = ch(m.spouseId);
-    if (sp && sp.alive && !sp.female && !sp.prisonerOf && chance(0.022 * f)) { birth(m, sp); continue; }
+    if (sp && sp.alive && !sp.female && !sp.prisonerOf && chance(0.022 * f)) { conceive(m, sp); continue; }
     for (const lid of m.lovers) {
       const l = ch(lid);
-      if (l && l.alive && !l.female && chance(0.012 * f)) { birth(m, l); break; }
+      if (l && l.alive && !l.female && chance(0.012 * f)) { conceive(m, l); break; }
     }
   }
 }
@@ -831,17 +840,17 @@ function decayTick() {
 }
 function populationTick() {
   const all = living();
-  if (all.length > 420) {
+  if (all.length > 900) {
     const p = P();
     const movers = all.filter(c => c.id !== p.id && isAdult(c) && c.rank <= 1 && !c.titles.length && !c.prisonerOf &&
       !relevant(c) && !all.some(x => x.lordId === c.id));
-    for (const c of shuffle(movers).slice(0, Math.min(6, all.length - 420))) die(c, L('Diyardan göç etti', 'Left the land'));
+    for (const c of shuffle(movers).slice(0, Math.min(10, all.length - 900))) die(c, L('Diyardan göç etti', 'Left the land'));
   }
   pruneTick();
   const adults = living().filter(isAdult).length;
-  if (adults >= 230) return;
+  if (adults >= 500) return;
   const lords = living().filter(x => x.rank >= 3);
-  const n = adults < 180 ? 3 : 1;
+  const n = adults < 400 ? 4 : 1;
   for (let i = 0; i < n; i++) {
     const r = weighted([[0, 4], [1, 3], [2, 2]]);
     const lord = lords.length ? pick(lords) : null;
@@ -890,6 +899,8 @@ function monthTick() {
   secretsTick();
   grantTick();
   birthsTick();
+  pregTick();
+  intimacyTick();
   for (const c of living()) healthTick(c);
   fillVacant();
   decayTick();

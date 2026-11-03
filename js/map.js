@@ -208,10 +208,12 @@ function drawMap(time) {
   }
   ctx.setTransform(d, 0, 0, d, 0, 0);
   // Krallık adları (uzak görünüm)
+  const placed = []; // çakışan yazıları atla (önce büyük krallıklar)
+  const free_ = (x0, y0, x1, y1) => { if (placed.some(q => x0 < q[2] && x1 > q[0] && y0 < q[3] && y1 > q[1])) return false; placed.push([x0, y0, x1, y1]); return true; };
   if (z < 22) {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    for (const r of realms()) {
-      const ss = SETTS.filter(s => s.liege === r.id);
+    const rl = realms().map(r => [r, SETTS.filter(s => s.liege === r.id)]).sort((a, b) => b[1].length - a[1].length);
+    for (const [r, ss] of rl) {
       if (!ss.length) continue;
       const cx = ss.reduce((a, s) => a + s.x, 0) / ss.length, cy = ss.reduce((a, s) => a + s.y, 0) / ss.length;
       const [sx, sy] = mapToScreen(cx, cy);
@@ -220,10 +222,11 @@ function drawMap(time) {
       ctx.font = `700 ${fs}px "Cinzel", Georgia, serif`;
       ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(15,10,5,0.75)'; ctx.fillStyle = 'rgba(255,246,226,0.92)';
       const label = realmShort(r).toLocaleUpperCase(LANG === 'tr' ? 'tr' : 'en');
+      const fh = Math.round(fs * 0.95), fw = Math.round(fh * 1.5), tw = ctx.measureText(label).width;
+      if (!free_(sx - tw / 2 - fw - 8, sy - 14 - fs / 2 - 2, sx + tw / 2 + 2, sy - 14 + fs / 2 + 2)) continue;
       ctx.strokeText(label, sx, sy - 14); ctx.fillText(label, sx, sy - 14);
       const im = flagImage(r);
       if (im) {
-        const fh = Math.round(fs * 0.95), fw = Math.round(fh * 1.5), tw = ctx.measureText(label).width;
         const fx = sx - tw / 2 - fw - 6, fy = sy - 14 - fh / 2;
         ctx.fillStyle = 'rgba(10,7,4,.6)'; ctx.fillRect(fx + 1.5, fy + 1.5, fw, fh);
         ctx.drawImage(im, fx, fy, fw, fh);
@@ -263,8 +266,11 @@ function drawMap(time) {
   }
   // Yerleşim adları en üstte
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  names.sort((a, b) => (b[0].capital ? 1 : 0) - (a[0].capital ? 1 : 0) || (b[0].holder === G.playerId) - (a[0].holder === G.playerId));
   for (const [s, x, y] of names) {
     ctx.font = `${s.capital ? 700 : s.kind === 'sehir' ? 600 : 500} ${nameFont(z, s)}px Alegreya, Georgia, serif`;
+    const w2 = ctx.measureText(s.name).width / 2;
+    if (!free_(x - w2, y, x + w2, y + nameFont(z, s))) continue;
     ctx.lineWidth = 2.6; ctx.strokeStyle = 'rgba(15,10,5,0.82)'; ctx.fillStyle = s.holder === G.playerId ? '#ffd76a' : s.capital ? '#fff3d6' : '#efe3c8';
     ctx.strokeText(s.name, x, y); ctx.fillText(s.name, x, y);
   }
@@ -444,7 +450,7 @@ function setupMapInput(cv) {
     if (pts.size === 2 && pinch) {
       const [a, b] = [...pts.values()];
       const nd = Math.hypot(a[0] - b[0], a[1] - b[1]);
-      zoomAt(pinch.mx, pinch.my, clamp(pinch.z * nd / pinch.d, 6, 90));
+      zoomAt(pinch.mx, pinch.my, clamp(pinch.z * nd / pinch.d, 2.5, 90));
     } else if (pts.size === 1 && start) {
       const dx = e.clientX - start.x, dy = e.clientY - start.y;
       if (Math.hypot(dx, dy) > 8) moved = true;
@@ -461,7 +467,7 @@ function setupMapInput(cv) {
     } else { const [p] = [...pts.values()]; start = { x: p[0], y: p[1], cx: CAM.x, cy: CAM.y, t: 0 }; }
   };
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
-  cv.addEventListener('wheel', e => { e.preventDefault(); zoomAt(e.clientX, e.clientY, clamp(CAM.z * (e.deltaY < 0 ? 1.15 : 0.87), 6, 90)); }, { passive: false });
+  cv.addEventListener('wheel', e => { e.preventDefault(); zoomAt(e.clientX, e.clientY, clamp(CAM.z * (e.deltaY < 0 ? 1.15 : 0.87), 2.5, 90)); }, { passive: false });
 }
 function zoomAt(sx, sy, nz) {
   const r = MAPCV.getBoundingClientRect();

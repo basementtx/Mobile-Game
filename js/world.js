@@ -30,13 +30,23 @@ function buildGeo() {
   });
   GRID.w = Math.ceil(MAP.W / GRID.step); GRID.h = Math.ceil(MAP.H / GRID.step);
   LANDGRID = new Uint8Array(GRID.w * GRID.h);
-  for (let j = 0; j < GRID.h; j++) {
-    const y = (j + 0.5) * GRID.step;
-    for (let i = 0; i < GRID.w; i++) {
-      const x = (i + 0.5) * GRID.step;
-      for (const p of LANDP) {
-        if (x < p.x0 || x > p.x1 || y < p.y0 || y > p.y1) continue;
-        if (inRing(x, y, p.rings[0]) && !p.rings.slice(1).some(h => inRing(x, y, h))) { LANDGRID[j * GRID.w + i] = 1; break; }
+  // Tarama çizgisiyle doldurma: her poligon için satır satır kesişimleri bul (tüm dünya için hızlı)
+  const xs = [];
+  for (const p of LANDP) {
+    const j0 = Math.max(0, Math.floor(p.y0 / GRID.step)), j1 = Math.min(GRID.h - 1, Math.ceil(p.y1 / GRID.step));
+    for (let j = j0; j <= j1; j++) {
+      const y = (j + 0.5) * GRID.step;
+      xs.length = 0;
+      for (const r of p.rings) {
+        for (let i = 0, k = r.length - 1; i < r.length; k = i++) {
+          const yi = r[i][1], yk = r[k][1];
+          if ((yi > y) !== (yk > y)) xs.push(r[i][0] + (y - yi) / (yk - yi) * (r[k][0] - r[i][0]));
+        }
+      }
+      xs.sort((u, v) => u - v);
+      for (let q = 0; q + 1 < xs.length; q += 2) {
+        const i0 = Math.max(0, Math.ceil(xs[q] / GRID.step - 0.5)), i1 = Math.min(GRID.w - 1, Math.floor(xs[q + 1] / GRID.step - 0.5));
+        for (let i = i0; i <= i1; i++) LANDGRID[j * GRID.w + i] = 1;
       }
     }
   }
@@ -785,7 +795,7 @@ function newWorld(opt) {
     year: 1180, month: 2, day: 0, dayFrac: 0, turn: 1, turnLeft: 0, chars: {}, titles: {}, secrets: [], wars: [], log: [], queue: [], parties: [], feud: [], settIds: [],
     nextId: 1, nextTitle: 1, nextSecret: 1, nextWar: 1, nextParty: 1, nextRumor: 1, playerId: null, ap: AP_MAX,
     over: null, monthsPlayed: 0, generation: 1, founder: `${opt.name} ${opt.dyn}`, personalFoes: [],
-    rumors: [], pacts: [], council: {}, law: { vergi: 1, yukumluluk: 1, veraset: 'erkek' }, cd: {}, loan: null, start: 'hukumdar',
+    rumors: [], pacts: [], council: {}, law: { vergi: 1, yukumluluk: 1, veraset: 'erkek' }, cd: {}, loan: null, start: 'hukumdar', geoV: 2,
   };
   buildGeo();
   const rt = {};
@@ -857,9 +867,9 @@ function newWorld(opt) {
   for (const [a, b] of START_WARS) { const ra = rt[a], rb = rt[b]; if (ra && rb) G.wars.push({ a: ra.id, b: rb.id, start: 0, taken: { [ra.id]: 0, [rb.id]: 0 } }); }
   for (const [a, b] of START_PACTS) if (rt[a] && rt[b]) addPact(rt[a], rt[b]);
   for (const c of living()) {
-    if (chance(0.12) && isAdult(c)) {
+    if (chance(0.12) && isGrown(c)) {
       const others = nearby(c).filter(x => x.id !== p.id && !closeKin(c, x));
-      if (others.length) { const o = pick(others); if (chance(0.5) && o.female !== c.female) becomeLovers(c, o); else addOp(c, o, rnd(-60, 60)); }
+      if (others.length) { const o = pick(others); if (chance(0.5) && isGrown(o) && attracted(c, o) && attracted(o, c)) becomeLovers(c, o); else addOp(c, o, rnd(-60, 60)); }
     }
   }
   seedBonds();
@@ -869,6 +879,8 @@ function newWorld(opt) {
     const f = pick(court); setBond(p, f, 'dost'); addOp(f, p, 30); addOp(p, f, 30);
     const r2 = pick(court.filter(x => x !== f)); setBond(p, r2, 'rakip'); addOp(r2, p, -35); addOp(p, r2, -30);
   }
+  makeAncestry(p);
+  spawnCourtStaff(p, 9);
   if (ownRealm(p)) autoCouncil(p);
   p.inv = [];
   G.terrDirty = true;
@@ -901,12 +913,48 @@ function migrateSave() {
     if (s.pop == null) s.pop = s.kind === 'sehir' ? rnd(18, 34) : rnd(8, 16);
   }
 }
+/* Eski kayıtlar Avrupa haritasındaydı: koordinatları dünya haritasına taşı ve yeni krallıkları ekle */
+function migrateWorld() {
+  const dx = (-12 - MAP.LON0) * MAP.COS, dy = MAP.LAT1 - 66;
+  for (const s of settlements()) { s.x += dx; s.y += dy; }
+  for (const pt of G.parties) {
+    pt.x += dx; pt.y += dy;
+    if (pt.tx != null) { pt.tx += dx; pt.ty += dy; }
+    if (pt.hx != null) { pt.hx += dx; pt.hy += dy; }
+    pt.leg = null; pt.path = [];
+  }
+  if (G.lastX != null) { G.lastX += dx; G.lastY += dy; }
+  const rt = {};
+  for (const t of Object.values(G.titles)) if (isRealm(t) && t.key) rt[t.key] = t;
+  const added = [];
+  for (let i = G.settIds.length; i < SETTLEMENTS.length; i++) {
+    const [name, lon, lat, type, rk, cap] = SETTLEMENTS[i];
+    if (!rt[rk]) { const R = REALMS[rk]; rt[rk] = addTitle(R.ad, 5, null, { kind: 'realm', key: rk, color: R.renk, cul: R.kul }); added.push(rk); }
+    const [x, y] = proj(lon, lat);
+    const st = addTitle(settName(name), 3, rt[rk].id, { trName: name, kind: type, x, y, capital: !!cap, garrison: type === 'sehir' ? 40 : 32, prosperity: 1, cul: REALMS[rk].kul, siege: null, pool: {},
+      b: { ciftlik: 1, sur: cap ? 2 : type === 'kale' ? 1 : 0 }, q: null, tax: 1, unrest: rnd(3, 18), pop: type === 'sehir' ? rnd(18, 34) : rnd(8, 16) });
+    st.pool = poolFor(st);
+    G.settIds.push(st.id);
+  }
+  for (const key of added) {
+    const Rk = REALMS[key], list = settlements().filter(x => x.liege === rt[key].id);
+    const capS = list.find(x => x.capital) || list[0];
+    const ruler = makeChar({ cul: Rk.kul, dyn: Rk.han, rank: 5, age: rnd(25, 58), gold: 300, prestige: 300 + rnd(0, 200), female: chance(0.12) });
+    giveTitle(rt[key], ruler); giveTitle(capS, ruler);
+    for (const st of list.filter(x => x !== capS)) giveTitle(st, makeChar({ cul: Rk.kul, rank: 3, age: rnd(20, 60), gold: rnd(80, 160), prestige: rnd(60, 160) }));
+    makeChar({ cul: Rk.kul, rank: 2, age: rnd(18, 45), gold: 20, prestige: 30, lordId: ruler.id });
+  }
+  refreshLieges();
+  G.geoV = 2;
+}
 function afterLoad() {
   buildGeo();
+  if (!G.geoV) migrateWorld();
   relocalize();
   migrateSave();
   G.turn = G.turn || 1; G.turnLeft = G.turnLeft || 0;
   G.start = 'hukumdar';
+  if (!G.staffV) { const pl = P(); if (pl && pl.alive) spawnCourtStaff(pl, 7); G.staffV = 1; }
   ensurePlayerParty();
   for (const pt of G.parties) {
     if (pt.kind === 'player') { pt.royal = false; pt.path = pt.path || []; if (!pt.leg && G.turnLeft <= 0) { const p = provinceAt(pt.x, pt.y); if (p && Math.hypot(p.x - pt.x, p.y - pt.y) > CONTACT) { pt.x = p.x; pt.y = p.y; } } pt.tx = pt.ty = null; }
