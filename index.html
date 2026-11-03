@@ -15,10 +15,20 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Alegreya:ital,wght@0,400;0,600;1,400&display=swap">
   <link rel="stylesheet" href="css/style.css">
+  <script>
+    /* Bir betik yüklenemez ya da çözümlenemezse boş ekran yerine hatayı göster */
+    window.__bootErr = [];
+    window.addEventListener('error', function (e) {
+      if (window.BOOT_OK) return;
+      window.__bootErr.push((e.message || 'Error') + ' @ ' + String(e.filename || '').split('/').pop() + ':' + (e.lineno || ''));
+      var m = document.querySelector('.boot-msg');
+      if (m) { m.textContent = 'Hata / Error: ' + window.__bootErr[0]; m.style.color = '#f0998f'; }
+    });
+  </script>
 </head>
 <body>
   <!-- @@BODY -->
-  <div id="setup" class="screen"></div>
+  <div id="setup" class="screen"><div class="boot"><div class="boot-logo">⚜</div><h1>Taç ve Hançer</h1><p class="boot-msg">Yükleniyor… · Loading…</p><div class="boot-bar"><i></i></div></div></div>
   <div id="game" class="screen hidden">
     <canvas id="mapcv"></canvas>
     <div id="hudL" class="hud"></div>
