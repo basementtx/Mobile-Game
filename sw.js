@@ -1,8 +1,8 @@
 /* Crown & Dagger — service worker.
    İnternet varken her dosyayı sunucudan taze çeker (oyun her açılışta kendiliğinden güncellenir);
    internet yoksa son indirilen sürümle çevrimdışı çalışır. */
-const CACHE = 'crown-dagger-v11';
-const FILES = ['./', './index.html', './css/style.css', './js/i18n.js', './js/icons.js', './js/flags.js', './js/data.js', './js/prefs.js', './js/geo.js', './js/engine.js', './js/world.js', './js/provinces.js', './js/actions.js', './js/realm.js', './js/events.js', './js/dialogue.js', './js/audience.js', './js/map.js', './js/battle.js', './js/portrait.js', './js/ui.js', './js/ui2.js', './js/provui.js', './js/nighttext.js', './js/intimacy.js', './js/family.js', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png'];
+const CACHE = 'crown-dagger-v12';
+const FILES = ['./', './index.html', './css/style.css', './js/i18n.js', './js/icons.js', './js/flags.js', './js/data.js', './js/prefs.js', './js/geo.js', './js/engine.js', './js/world.js', './js/front.js', './js/realm.js', './js/actions.js', './js/events.js', './js/dialogue.js', './js/audience.js', './js/portrait.js', './js/ui.js', './js/ui2.js', './js/fmap.js', './js/fui.js', './js/family.js', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

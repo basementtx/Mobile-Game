@@ -262,7 +262,6 @@ function becomeLovers(a, b) {
   if (!b.lovers.includes(a.id)) b.lovers.push(a.id);
   addOp(a, b, 15); addOp(b, a, 15);
   if (a.spouseId || b.spouseId) addSecret('zina', a.id, b.id, [a.id, b.id]);
-  if (closeKin(a, b) && !G.secrets.some(s => s.type === 'ensest' && [s.actor, s.target].includes(a.id) && [s.actor, s.target].includes(b.id))) addSecret('ensest', a.id, b.id, [a.id, b.id]);
 }
 function breakUp(a, b) {
   a.lovers = a.lovers.filter(x => x !== b.id);
@@ -305,7 +304,6 @@ function opinionParts(a, b) {
   if (a.prisonerOf === b.id) parts.push([L('Onu zindanda tutuyor', 'Keeps them imprisoned'), -30]);
   if (typeof prefOpinionParts === 'function') for (const x of prefOpinionParts(a, b)) parts.push(x);
   if (typeof vassalLawParts === 'function') for (const x of vassalLawParts(a, b)) parts.push(x);
-  if (typeof sexOpinionParts === 'function') for (const x of sexOpinionParts(a, b)) parts.push(x);
   return parts;
 }
 function opinion(a, b) { return clamp(opinionParts(a, b).reduce((s, p) => s + p[1], 0), -100, 100); }
@@ -351,14 +349,6 @@ function exposeSecret(s) {
     for (const x of living()) if (familyRel(x, t) || x.lovers.includes(t.id)) addOp(x, a, s.type === 'cinayet' ? -80 : -40);
     addOp(t, a, -60);
     if (s.type === 'cinayet' && closeKin(a, t)) addTrait(a, 'akrabakatili');
-  }
-  if (s.type === 'ensest' && t && a) {
-    t.shame += 25; t.prestige -= 25;
-    for (const x of living()) {
-      if (x.id === a.id || x.id === t.id) continue;
-      const pen = has(x, 'dindar') || has(x, 'durust') ? -30 : -10;
-      if (familyRel(x, a) || familyRel(x, t) || has(x, 'dindar') || has(x, 'durust')) { addOp(x, a, pen); addOp(x, t, pen); }
-    }
   }
   if (s.type === 'pic' && t && a) {
     if (a.spouseId) { const sp = ch(a.spouseId); if (sp) addOp(sp, a, -60); }
@@ -440,22 +430,19 @@ function execute(captor, c) {
 }
 
 /* ---------- Ekonomi / Ordu ---------- */
+/* Aylık kişisel gelir. Hükümdarların hazinesi ulusun gerçek zamanlı gelirinden dolar (front.js). */
 function income(c) {
   if (c.age < 16 || c.prisonerOf) return 0;
-  const y = stat(c, 'yon');
-  let g = [1, 2, 4, 0, 0, 0][Math.min(c.rank, 5)];
-  for (const t of settlementsOf(c)) g += settIncome(t, c);
-  const r = ownRealm(c);
-  const vt = c.id === G.playerId ? [2.5, 4, 6, 8][law().vergi] : 3;
-  if (r) g += vt * Object.values(G.titles).filter(t => isSettlement(t) && t.liege === r.id && t.holder !== c.id).length;
-  if (c.id === G.playerId) g *= 1 + councilBonus('hazinedar') * 0.015;
+  if (typeof natOfRealm === 'function' && natOfRealm(ownRealm(c))) return 0;
+  let g = [1, 2, 4, 5, 6, 6][Math.min(c.rank, 5)];
+  g += settlementsOf(c).length * (5 + Math.floor(stat(c, 'yon') / 4));
   return Math.round(g);
 }
 /* ---------- Savaş ---------- */
 /* ---------- Ortak etkileşim sonuçları (oyuncu ve NPC aynı kurallar) ---------- */
 function seduceChance(a, b) {
   return clamp(Math.round(20 + (stat(a, 'cek') - 5) * 6 + opinion(b, a) / 2 + (has(b, 'sehvetli') ? 20 : 0) -
-    (has(b, 'iffetli') ? 35 : 0) - (b.spouseId ? 10 : 0) - (closeKin(a, b) ? (has(b, 'sehvetli') ? 15 : 35) : 0)), 3, 92);
+    (has(b, 'iffetli') ? 35 : 0) - (b.spouseId ? 10 : 0)), 3, 92);
 }
 function marryChance(a, b) {
   return clamp(Math.round(15 + opinion(b, a) / 1.5 + (a.rank - b.rank) * 15 + (stat(a, 'cek') - 5) * 3), 2, 95);
@@ -532,7 +519,6 @@ function birth(mother, father) {
     age: 0, traits: inheritTraits(mother, father), gold: 0, cul: (legit || mother).cul,
     base: Object.fromEntries(Object.keys(STATS).map(k => [k, clamp(Math.round((mother.base[k] + father.base[k]) / 2) + rnd(-2, 2), 1, 14)])),
   });
-  if (closeKin(mother, father) && chance(0.5)) addTrait(kid, 'akrabacocugu');
   kid.motherId = mother.id;
   mother.children.push(kid.id);
   if (!father.children.includes(kid.id)) father.children.push(kid.id);
@@ -584,7 +570,7 @@ function npcAct(c) {
   const w = (k, v) => { if (v > 0) opts.push([k, v]); };
   w('sohbet', 2);
   w('hediye', has(c, 'comert') ? 2 : 0.5);
-  w('bastan', !isGrown(c) ? 0 : (has(c, 'sehvetli') ? 2.5 : has(c, 'iffetli') ? 0 : 0.4) * (c.sx ? c.sx.lib / 50 : 1));
+  w('bastan', !isGrown(c) ? 0 : (has(c, 'sehvetli') ? 2.5 : has(c, 'iffetli') ? 0 : 0.4));
   if (!c.spouseId && c.age < 55) w('evlen', 2);
   w('iftira', has(c, 'kurnaz') ? 1.5 : 0.3);
   w('suikast', (has(c, 'zalim') || has(c, 'hirsli')) && !has(c, 'merhametli') ? 0.5 : 0.08);
@@ -798,6 +784,7 @@ function grantTick() {
 function fillVacant() {
   for (const t of Object.values(G.titles)) {
     if (t.dead) continue;
+    if (isSettlement(t) && !t.liege) continue; // sahipsiz/kabile toprağındaki yerleşim
     if (t.holder != null && ch(t.holder) && ch(t.holder).alive) continue;
     const lt = t.liege ? G.titles[t.liege] : null;
     const lh = lt && lt.holder != null ? ch(lt.holder) : null;
@@ -910,7 +897,6 @@ function monthTick() {
   grantTick();
   birthsTick();
   pregTick();
-  intimacyTick();
   for (const c of living()) healthTick(c);
   fillVacant();
   decayTick();
@@ -927,7 +913,8 @@ function monthTick() {
 /* ---------- Yeni oyun ---------- */
 /* ---------- Kayıt ---------- */
 function saveGame() {
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) { /* kayıt yapılamadı */ }
+  if (!G) return;
+  try { if (typeof frontSerialize === 'function') frontSerialize(); localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) { /* kayıt yapılamadı */ }
 }
 /* Kayıt metni: yeni anahtar, yoksa eski kayıt (oyuncu bir krallığın hükümdarıysa) */
 function readSave() {

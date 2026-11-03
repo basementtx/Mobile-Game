@@ -1,11 +1,11 @@
 'use strict';
 /* =========================================================
-   Crown & Dagger — Arayüz (yatay ekran, tur tabanlı)
+   Crown & Dagger — Arayüz (yatay ekran, gerçek zamanlı)
    ========================================================= */
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
-const UI = { screen: 'setup', drawer: null, filter: 'saray', sheet: null, modal: null, breakdown: false, speed: 1, forcePortrait: false, sett: null, selProv: null, provOpen: false, hold: null, realmTab: 'genel' };
+const UI = { screen: 'setup', drawer: null, filter: 'saray', sheet: null, modal: null, breakdown: false, speed: 1, forcePortrait: false, pop: null, realmTab: 'genel' };
 let SETUP = null;
 
 /* ---------- Simgeler (emoji yerine game-icons.net SVG'leri) ---------- */
@@ -241,11 +241,10 @@ function renderSetup() {
 /* ---------- Oyun ekranı ---------- */
 let _mapReady = false;
 function buildTools() {
-  $('#tools').innerHTML = [['ben', '👤', L('Karakter', 'Character')], ['aile', '🌳', L('Aile', 'Family')], ['krallik', '👑', L('Krallık', 'Realm')], ['topraklar', '🏰', L('Topraklar', 'Domain')], ['ordu', '⚔️', L('Ordu', 'Army')], ['kisiler', '👥', L('Kişiler', 'People')], ['eylem', '🗡️', L('Entrika', 'Intrigue')], ['dunya', '🌍', L('Dünya', 'World')], ['gunluk', '📜', L('Günlük', 'Chronicle')]]
+  $('#tools').innerHTML = [['ben', '👤', L('Karakter', 'Character')], ['aile', '🌳', L('Aile', 'Family')], ['krallik', '👑', L('Krallık', 'Realm')], ['kisiler', '👥', L('Kişiler', 'People')], ['eylem', '🗡️', L('Entrika', 'Intrigue')], ['dunya', '🌍', L('Dünya', 'World')], ['gunluk', '📜', L('Günlük', 'Chronicle')]]
     .map(([k, i, l]) => `<button data-drawer="${k}"><span>${i}</span>${l}</button>`).join('');
   $('#tools').querySelectorAll('[data-drawer]').forEach(b => b.onclick = () => openDrawer(b.dataset.drawer));
 }
-function centerOn(x, y, z) { CAM.follow = false; CAM.x = x; CAM.y = y; if (z) CAM.z = Math.max(CAM.z, z); }
 function startGameUI() {
   showScreen('game');
   if (!_mapReady) {
@@ -253,31 +252,24 @@ function startGameUI() {
     _mapReady = true;
     buildTools();
     $('#drawer .dx').onclick = closeDrawer;
-    $('#endturn').onclick = endTurn;
   }
-  closeProv();
+  closePop();
+  const n = myNat();
   const seat = seatOf(P());
-  const pp = playerParty();
-  if (seat) centerOn(seat.x, seat.y); else if (pp) centerOn(pp.x, pp.y);
-  CAM.z = 26;
+  if (seat && seat.tile >= 0) centerOnTile(seat.tile);
+  else if (n) { const t = natLabelTile(n.i); if (t >= 0) centerOnTile(t); }
+  CAM.z = 22;
   resizeMap();
+  repaintAll();
+  for (const h of ['#hudL', '#hudR', '#ctrl', '#atks', '#lb']) { const e = $(h); if (e) e._h = null; }
   updateHUD();
   processQueue();
 }
-function armyStatus(pp) {
-  if (!pp) return '';
-  if (!armyActive(pp)) return L('Dağıtıldı', 'Disbanded');
-  if (pp.mode === 'siege') { const s = G.titles[pp.sid]; return s ? L(`${s.name} kuşatılıyor`, `Besieging ${s.name}`) : ''; }
-  if ((pp.path && pp.path.length) || pp.leg) { const t = turnTurnsLeft(pp); const g = pp.goal ? G.titles[pp.goal] : null; return g ? L(`${g.name} yolunda · ${t} tur`, `Marching on ${g.name} · ${t} turn${t > 1 ? 's' : ''}`) : L(`Yürüyüşte · ${t} tur`, `On the march · ${t} turn${t > 1 ? 's' : ''}`); }
-  if (pp.chase != null) return L('Düşmanı izliyor', 'Pursuing');
-  return armyAtHome(pp) ? L('Hazır bekliyor', 'Standing ready') : L('Konakladı', 'Encamped');
-}
 function updateHUD() {
   if (!G || UI.screen !== 'game') return;
-  const p = P(), pp = playerParty();
-  const n = pp ? troopCount(pp) : 0;
+  const p = P();
   const r = ownRealm(p) || realmOf(p);
-  const inc = income(p);
+  const n = myNat();
   if (setHTML($('#hudL'), `
     <div class="who">
       <button class="who-pt" data-me>${avatar(p, 58)}</button>
@@ -285,9 +277,8 @@ function updateHUD() {
       <button class="who-tx" data-me><b>${esc(nm(p))}</b><small>${esc(r ? r.name : titleOf(p))}</small></button>
     </div>
     <div class="res">
-      <span title="${L('Hazine (aylık)', 'Treasury (monthly)')}">💰 <b>${p.gold}</b><small class="${inc >= 0 ? 'good' : 'bad'}">${inc >= 0 ? '+' : ''}${inc}</small></span>
+      ${n ? `<span title="${L('Toprak', 'Land')}">🗺️ <b>${(landShare(n.i) * 100).toFixed(1)}%</b></span>` : `<span title="${L('Kişisel altın', 'Personal gold')}">💰 <b>${p.gold}</b></span>`}
       <span title="${L('Şan', 'Prestige')}">⭐ <b>${Math.round(p.prestige)}</b></span>
-      <span title="${L('Kraliyet ordusu', 'Royal army')}">🪖 <b>${n}</b><small>/${partyCap(p)}</small></span>
       ${p.dread >= 5 ? `<span title="${L('Korku', 'Dread')}">💀 <b>${Math.round(p.dread)}</b></span>` : ''}
       <span class="${p.health < 40 ? 'warn' : ''}" title="${L('Sağlık', 'Health')}">❤️ <b>${Math.round(p.health)}</b></span>
       <span class="${p.stress > 70 ? 'warn' : ''}" title="${L('Stres', 'Stress')}">😰 <b>${Math.round(p.stress)}</b></span>
@@ -296,205 +287,66 @@ function updateHUD() {
     $('#hudL').querySelectorAll('[data-me]').forEach(b => b.onclick = () => openSheet(P().id));
     $('#hudL [data-realm]').onclick = () => openRealm();
   }
-  if (setHTML($('#hudR'), `<span class="date"><b>${(G.day % 30) + 1} ${monthName(G.month)} ${G.year}</b><small>${L('Tur', 'Turn')} ${G.turn || 1}</small></span>
-    <button id="mmBtn" class="mm" title="${L('Harita modu', 'Map mode')}">🗺️<small>${mapModeName(UI.mapMode || 'siyasi')}</small></button>
-    <button id="spd" title="${L('Tur hızı', 'Turn speed')}">${UI.speed === 1 ? '▶' : UI.speed === 2 ? '▶▶' : '▶▶▶'}</button>
+  const sp = UI.speed;
+  if (setHTML($('#hudR'), `<span class="date"><b>${(G.day % 30) + 1} ${monthName(G.month)} ${G.year}</b><small>${sp === 0 ? L('Duraklatıldı', 'Paused') : L('Gerçek zamanlı', 'Real time')}</small></span>
+    <button id="pauseBtn" class="${sp === 0 ? 'on' : ''}" title="${L('Duraklat', 'Pause')}">${sp === 0 ? '▶' : '❚❚'}</button>
+    <button id="spd" title="${L('Hız', 'Speed')}">${sp === 2 ? '2×' : sp === 3 ? '3×' : '1×'}</button>
     <button id="menuBtn" title="${L('Menü', 'Menu')}">☰</button>`)) {
-    $('#mmBtn').onclick = cycleMapMode;
-    $('#spd').onclick = () => { UI.speed = UI.speed === 1 ? 2 : UI.speed === 2 ? 4 : 1; updateHUD(); };
+    $('#pauseBtn').onclick = () => { if (UI.speed === 0) UI.speed = UI.lastSpeed || 1; else { UI.lastSpeed = UI.speed; UI.speed = 0; } updateHUD(); };
+    $('#spd').onclick = () => { const s = UI.speed || UI.lastSpeed || 1; UI.speed = s === 1 ? 2 : s === 2 ? 3 : 1; updateHUD(); };
     $('#menuBtn').onclick = openMenu;
   }
-  const btns = [];
   let status = '';
-  const busy = G.turnLeft > 0;
-  if (p.prisonerOf) {
-    status = L(`⛓️ ${esc(nm(ch(p.prisonerOf)))} seni zindanda tutuyor.`, `⛓️ ${esc(nm(ch(p.prisonerOf)))} holds you in the dungeon.`);
-    if (!busy) { btns.push(['kacis', L('🏃 Kaçmayı dene', '🏃 Try to escape')]); if (p.gold >= 30) btns.push(['gardiyan', L('🔑 Rüşvet (30💰)', '🔑 Bribe (30💰)')]); }
-  }
-  if (pp) {
-    btns.push(['army', `<i class="sw" style="background:#ffcf4a"></i>${esc(armyName(pp))} · <b>${n}</b><small>${esc(armyStatus(pp))}</small>`]);
-    if (!busy && pp.mode === 'siege' && G.titles[pp.sid] && G.titles[pp.sid].siege && G.titles[pp.sid].siege.days >= 3) btns.push(['assault', L('🔥 Hücum', '🔥 Storm')]);
-    if (!busy && ((pp.path && pp.path.length) || pp.chase != null)) btns.push(['stop', L('✋ Durdur', '✋ Halt')]);
-  }
-  if (setHTML($('#ctxbar'), btns.map(([k, l]) => `<button data-c="${k}" class="${k === 'army' ? 'armychip' : ''}">${l}</button>`).join('')))
-    $('#ctxbar').querySelectorAll('[data-c]').forEach(b => b.onclick = () => ctxAction(b.dataset.c));
-  // Turu bitir düğmesi
-  const sub = busy ? L('Tur işliyor…', 'Resolving…') : L(`${TURN_DAYS} gün geçer`, `${TURN_DAYS} days pass`);
-  setHTML($('#endturn'), `<b>${busy ? '⏳' : L('TURU BİTİR', 'END TURN')}</b><small>${sub}</small>`);
-  $('#endturn').classList.toggle('busy', busy);
+  if (p.prisonerOf) status = L(`⛓️ ${esc(nm(ch(p.prisonerOf)))} seni zindanda tutuyor.`, `⛓️ ${esc(nm(ch(p.prisonerOf)))} holds you in the dungeon.`);
+  else if (!n) status = L('Bir krallığın yok — topraksız bir soylusun.', 'You hold no realm — a landless noble.');
   const wars = enemiesOf(realmOf(p));
-  if (!status && busy) status = L('⏳ Zaman akıyor…', '⏳ Time passes…');
-  if (!status && wars.length) status = `${L('Savaşta', 'At war')}: ${wars.map(r => flagHtml(r, 12) + esc(realmShort(r))).join(' ')}`;
-  setHTML($('#status'), status);
+  if (!status && n && G.tick < (G.truce || 0)) status = L(`🕊️ Ateşkes: ${Math.ceil((G.truce - G.tick) / 10)} sn — henüz kimse sana saldırmıyor. Sahipsiz topraklara yayıl!`, `🕊️ Truce: ${Math.ceil((G.truce - G.tick) / 10)} s — no one attacks you yet. Expand into unclaimed land!`);
+  if (!status && wars.length) status = `${L('Savaşta', 'At war')}: ${wars.slice(0, 4).map(r => flagHtml(r, 12) + esc(realmShort(r))).join(' ')}${wars.length > 4 ? ' …' : ''}`;
+  if (setHTML($('#status'), status + (p.prisonerOf ? ` <button data-c="kacis">${L('🏃 Kaç', '🏃 Escape')}</button>${p.gold >= 30 ? ` <button data-c="gardiyan">${L('🔑 Rüşvet', '🔑 Bribe')}</button>` : ''}` : '')))
+    $('#status').querySelectorAll('[data-c]').forEach(b => b.onclick = () => doAction(b.dataset.c, null));
   $('#status').classList.toggle('hidden', !status);
-  renderProv();
+  updateFrontHUD();
 }
-function ctxAction(k) {
-  if (G.turnLeft > 0) return;
-  const pp = playerParty();
-  if (k === 'army' && pp) { centerOn(pp.x, pp.y, 22); const pv = partyProv(pp); if (pv) selectProvince(pv.id); }
-  else if (k === 'stop') cancelOrders();
-  else if (k === 'assault' && pp) { const s = G.titles[pp.sid]; if (s) openAssault(s); }
-  else if (k === 'kacis' || k === 'gardiyan') doAction(k, null);
-  updateHUD();
-}
-function paused() { return !!UI.modal || !!UI.drawer || (G && G.queue.length > 0); }
-function endTurn() {
-  if (!G || G.over || G.turnLeft > 0 || paused()) return;
-  beginTurn();
-  updateHUD();
-}
+function paused() { return !!UI.modal || !!UI.drawer || (G && G.queue.length > 0) || UI.speed === 0; }
 
 /* ---------- Ana döngü ---------- */
-let _lastT = 0, _hudT = 0;
+let _lastT = 0, _hudT = 0, _acc = 0;
 function loop(t) {
-  const dt = Math.min(0.1, (t - _lastT) / 1000 || 0);
+  const dt = Math.min(0.25, (t - _lastT) / 1000 || 0);
   _lastT = t;
   try {
-    if (UI.screen === 'game' && G && !G.over) { tickMap(dt); if (UI.screen === 'game') drawMap(t); _hudT += dt; if (_hudT > 0.25) { _hudT = 0; updateHUD(); } }
+    if (UI.screen === 'game' && G && !G.over) {
+      const live = tickWorld(dt);
+      if (UI.screen === 'game') drawMap(t, live);
+      _hudT += dt; if (_hudT > 0.25) { _hudT = 0; updateHUD(); }
+    }
   } catch (e) { console.error(e); }
   requestAnimationFrame(loop);
 }
-function tickMap(dt) {
-  if (G.queue.length && !UI.modal) { processQueue(); return; }
-  if (paused() || !(G.turnLeft > 0)) return;
-  const day0 = G.day;
-  const foe = stepTurn(dt / DAY_SEC * UI.speed);
-  if (G.over) { closeDrawer(); renderGameOver(); return; }
-  if (G.day !== day0) onNewDay();
-  if (foe) openEncounter(foe);
-  if (!(G.turnLeft > 0)) { saveGame(); updateHUD(); }
-}
-function onNewDay() {
-  const pp = playerParty();
-  if (pp && pp.mode === 'siege') {
-    const s = G.titles[pp.sid];
-    if (!s || !s.siege || s.siege.by !== pp.id) { pp.mode = 'idle'; return; }
-    s.siege.days++;
-    if (s.siege.days >= 3 && !s.siege.asked) { s.siege.asked = true; openAssault(s); }
-  }
+function tickWorld(dt) {
+  if (G.queue.length && !UI.modal) { processQueue(); return false; }
+  if (paused()) { _acc = 0; return false; }
+  _acc += dt * UI.speed;
+  let n = 0;
+  const m0 = G.month;
+  while (_acc >= TICK && n < 8) { _acc -= TICK; n++; advanceRealtime(); if (G.over) break; }
+  if (n >= 8) _acc = 0;
+  if (G.over) { saveGame(); closeDrawer(); closePop(); renderGameOver(); return false; }
+  if (G.month !== m0) { saveGame(); if (UI.drawer) renderDrawer(); }
+  else saveGameThrottled();
+  return true;
 }
 
-/* ---------- Karşılaşma ve savaş ---------- */
-function openEncounter(foe) {
-  const pp = playerParty();
-  if (!pp || !G.parties.includes(foe)) return;
-  pp.chase = null; pp.tx = pp.ty = null; pp.leg = null; pp.path = []; pp.goal = null;
-  const c = ch(foe.owner), lead = armyLeader(pp);
-  const name = foe.kind === 'bandit' ? banditName(foe) : L(`${nm(c)} ordusu`, `Army of ${nm(c)}`);
-  const mp = partyPower(pp), tp = partyPower(foe);
-  const runC = clamp(Math.round(45 + (partySpeed(pp) - partySpeed(foe)) * 150 + (troopCount(pp) < 10 ? 15 : 0)), 10, 90);
-  const ratio = mp / Math.max(1, tp);
-  const odds = ratio > 1.6 ? `<b class="good">${L('Ezici üstünlük sende', 'Overwhelming advantage')}</b>` : ratio > 1.1 ? `<b class="good">${L('Avantaj sende', 'Advantage yours')}</b>` : ratio > 0.8 ? `<b class="mid">${L('Denk güçler', 'Even odds')}</b>` : ratio > 0.5 ? `<b class="bad">${L('Düşman daha güçlü', 'The enemy is stronger')}</b>` : `<b class="bad">${L('Ölümcül tehlike', 'Deadly danger')}</b>`;
-  showModal(`<div class="event"><h2>⚔️ ${esc(name)}</h2>
-    <div class="etext">${foe.kind === 'bandit' ? L(`Eşkıyalar ${esc(armyName(pp))}'nun yolunu kesti!`, `Bandits block the path of the ${esc(armyName(pp))}!`) : L(`${esc(nm(c))} sancakları ordunun karşısında dalgalanıyor.`, `The banners of ${esc(nm(c))} wave before your army.`)} ${lead ? L(`Mareşalin <b>${esc(nm(lead))}</b> emirlerini bekliyor.`, `Your marshal <b>${esc(nm(lead))}</b> awaits your orders.`) : L('Ordunun başında bir mareşal yok.', 'Your army has no marshal at its head.')}
-    <div class="vs"><div><b>${esc(armyName(pp))}</b>${troopCount(pp)} ${L('asker', 'men')}<br>${L('güç', 'strength')} ${mp}</div><div class="vsx">⚔</div><div><b>${foe.kind === 'bandit' ? L('Eşkıyalar', 'Bandits') : L('Düşman', 'Enemy')}</b>${troopCount(foe)} ${L('asker', 'men')}<br>${L('güç', 'strength')} ${tp}</div></div>${odds}</div>
-    <div class="eopts">
-      <button class="opt primary" data-e="fight">⚔️ ${L('Savaş!', 'Fight!')}</button>
-      <button class="opt" data-e="auto">🎲 ${L('Mareşale bırak (otomatik)', 'Leave it to the marshal (auto)')}</button>
-      <button class="opt" data-e="run">🏃 ${L('Kaçmayı dene', 'Try to flee')} (%${runC})</button>
-    </div></div>`, 'event');
-  const m = $('#modal');
-  m.querySelector('[data-e="fight"]').onclick = () => { closeModal(); fieldBattle(pp, foe); };
-  m.querySelector('[data-e="auto"]').onclick = () => {
-    const r = autoBattle(pp, foe);
-    const won = r.W === pp;
-    pp.ignore = pp.ignore || {}; pp.ignore[foe.id] = G.day + 2;
-    log(`⚔️ ${won ? L('Zafer', 'Victory') : L('Yenilgi', 'Defeat')}: ${name}. ${r.notes.join(' ')}`, won ? 'good' : 'bad');
-    if (G.over) { closeModal(); return renderGameOver(); }
-    resultModal(`${won ? `<h2 class="good">🏆 ${L('Zafer!', 'Victory!')}</h2>` : `<h2 class="bad">💀 ${L('Yenilgi', 'Defeat')}</h2>`}<p>${L('Senin kayıpların', 'Your losses')}: ${lossText(won ? r.lw : r.ll)}</p><p>${L('Düşman kayıpları', 'Enemy losses')}: ${lossText(won ? r.ll : r.lw)}</p><p>${r.notes.join('<br>')}</p>`);
-  };
-  m.querySelector('[data-e="run"]').onclick = () => {
-    pp.ignore = pp.ignore || {};
-    if (chance(runC / 100)) {
-      pp.ignore[foe.id] = G.day + 2; foe.stun = 1;
-      sendArmyHome(pp);
-      resultModal(`<p>${L('Ordun düşmandan sıyrıldı ve başkente çekiliyor.', 'Your army slipped away and falls back toward the capital.')}</p>`);
-    } else {
-      const lost = applyLosses(pp, 0.15);
-      pp.ignore[foe.id] = G.day + 1; foe.stun = 1;
-      sendArmyHome(pp);
-      resultModal(`<p>${L('Çekilirken artçılar yakalandı. Kayıplar', 'The rearguard was caught during the retreat. Losses')}: ${lossText(lost)}</p>`);
-    }
-  };
-}
 function resultModal(html) {
   showModal(`<div class="event ck"><div class="ev-main solo"><div class="etext">${html}</div><div class="eopts"><button class="opt primary" data-next>${L('Devam', 'Continue')}</button></div></div></div>`, 'event');
   $('#modal').querySelector('[data-next]').onclick = () => { closeModal(); saveGame(); updateHUD(); processQueue(); };
 }
-function fieldBattle(pp, foe) {
-  const lp = partyPower(foe);
-  const c = ch(foe.owner);
-  startBattle({
-    A: pp, enemy: { troops: foe.troops, leaderId: foe.kind === 'bandit' ? null : foe.owner, name: foe.kind === 'bandit' ? banditName(foe) : nm(c) }, siege: null,
-    onEnd: res => {
-      const p = P();
-      for (const k in res.lossA) { pp.troops[k] -= res.lossA[k]; if (pp.troops[k] <= 0) delete pp.troops[k]; }
-      if (G.parties.includes(foe)) for (const k in res.lossB) { foe.troops[k] -= res.lossB[k]; if (foe.troops[k] <= 0) delete foe.troops[k]; }
-      pp.ignore = pp.ignore || {}; pp.ignore[foe.id] = G.day + 2;
-      let notes = [];
-      const lead = armyLeader(pp);
-      if (res.heroDown && lead) { lead.health -= 35; addTrait(lead, 'yarali'); }
-      if (res.retreated) { foe.stun = 1; sendArmyHome(pp); }
-      else if (res.won) { if (G.parties.includes(foe)) notes = battleAftermath(pp, foe, { loserPower: lp, heroDown: res.leaderDown }); }
-      else notes = battleAftermath(foe, pp, { heroDown: res.heroDown });
-      if (lead && lead.alive && lead.health <= 0) die(lead, L('Savaşta aldığı yaralar', 'Wounds taken in battle'));
-      log(`⚔️ ${res.won ? L('Zafer', 'Victory') : res.retreated ? L('Geri çekilme', 'Retreat') : L('Yenilgi', 'Defeat')}. ${notes.join(' ')}`, res.won ? 'good' : 'bad');
-      return notes;
-    },
-  });
-}
-function openAssault(s) {
-  const pp = playerParty();
-  showModal(`<div class="event"><h2>🔥 ${L(`${esc(s.name)} kuşatması`, `Siege of ${esc(s.name)}`)}</h2>
-    <div class="etext">${L(`Merdivenler hazır, koçbaşı kapıya dayandı. Surlarda ${s.garrison} savunucu bekliyor.`, `The ladders are ready and the ram is at the gate. ${s.garrison} defenders wait on the walls.`)}
-    <div class="vs"><div><b>${esc(armyName(pp))}</b>${troopCount(pp)} ${L('asker', 'men')}<br>${L('güç', 'strength')} ${partyPower(pp)}</div><div class="vsx">⚔</div><div><b>${L('Garnizon', 'Garrison')}</b>${s.garrison} ${L('asker', 'men')}<br>${L('güç', 'strength')} ${garrisonPower(s)}</div></div></div>
-    <div class="eopts">
-      <button class="opt primary" data-e="fight">⚔️ ${L('Hücum!', 'Storm the walls!')}</button>
-      <button class="opt" data-e="auto">🎲 ${L('Mareşale bırak', 'Leave it to the marshal')}</button>
-      <button class="opt" data-e="wait">⏳ ${L('Kuşatmaya devam et', 'Continue the siege')}</button>
-      <button class="opt" data-e="lift">🏳️ ${L('Kuşatmayı kaldır', 'Lift the siege')}</button>
-    </div></div>`, 'event');
-  const m = $('#modal');
-  m.querySelector('[data-e="fight"]').onclick = () => { closeModal(); siegeBattle(pp, s); };
-  m.querySelector('[data-e="auto"]').onclick = () => {
-    const ok = siegeAssault(pp, s);
-    pp.mode = 'idle';
-    resultModal(ok ? `<h2 class="good">🏆 ${L(`${esc(s.name)} düştü!`, `${esc(s.name)} has fallen!`)}</h2>` : `<h2 class="bad">💀 ${L('Hücum püskürtüldü', 'The assault was repulsed')}</h2><p>${L('Askerlerin surların dibinde kaldı.', 'Your soldiers lie dead beneath the walls.')}</p>`);
-  };
-  m.querySelector('[data-e="wait"]').onclick = () => { s.siege.asked = false; s.siege.days = 1; closeModal(); };
-  m.querySelector('[data-e="lift"]').onclick = () => { s.siege = null; pp.mode = 'idle'; closeModal(); };
-}
-function siegeBattle(pp, s) {
-  const g = s.garrison;
-  startBattle({
-    A: pp, enemy: { troops: { piyade: Math.round(g * 0.6), okcu: Math.round(g * 0.4) }, leaderId: null, name: s.name }, siege: s,
-    onEnd: res => {
-      const p = P();
-      for (const k in res.lossA) { pp.troops[k] -= res.lossA[k]; if (pp.troops[k] <= 0) delete pp.troops[k]; }
-      const lead = armyLeader(pp);
-      if (res.heroDown && lead) { lead.health -= 35; addTrait(lead, 'yarali'); }
-      pp.mode = 'idle';
-      const notes = [];
-      if (res.won) captureSettlement(s, p);
-      else {
-        const killed = Object.values(res.lossB).reduce((a, b) => a + b, 0);
-        s.garrison = Math.max(5, s.garrison - killed);
-        s.siege = null;
-        notes.push(L(`Garnizon ${killed} kayıp verdi.`, `The garrison lost ${killed} men.`));
-      }
-      if (lead && lead.alive && lead.health <= 0) die(lead, L('Kuşatmada aldığı yaralar', 'Wounds taken in the siege'));
-      return notes;
-    },
-  });
-}
 
 /* ---------- Çekmece paneller ---------- */
-function drawerTitle(k) { return { aile: L('🌳 Aile ve hanedan', '🌳 Family & dynasty'), ben: L('👤 Karakter', '👤 Character'), kisiler: L('👥 Kişiler', '👥 People'), ordu: L('⚔️ Ordu', '⚔️ Army'), topraklar: L('🏰 Kraliyet arazisi', '🏰 Royal Domain'), dunya: L('🌍 Dünya', '🌍 World'), eylem: L('🗡️ Entrika ve kişisel eylemler', '🗡️ Intrigue & personal'), gunluk: L('📜 Günlük', '📜 Chronicle') }[k]; }
+function drawerTitle(k) { return { aile: L('🌳 Aile ve hanedan', '🌳 Family & dynasty'), ben: L('👤 Karakter', '👤 Character'), kisiler: L('👥 Kişiler', '👥 People'), dunya: L('🌍 Dünya', '🌍 World'), eylem: L('🗡️ Entrika ve kişisel eylemler', '🗡️ Intrigue & personal'), gunluk: L('📜 Günlük', '📜 Chronicle') }[k]; }
 function openDrawer(k) {
-  if (G.turnLeft > 0) return;
   if (k === 'krallik') return openRealm();
-  closeProv(); UI.drawer = k; renderDrawer(); $('#drawer').classList.remove('hidden'); $('#drawer .dbody').scrollTop = 0;
+  closePop(); UI.drawer = k; renderDrawer(); $('#drawer').classList.remove('hidden'); $('#drawer .dbody').scrollTop = 0;
 }
 function closeDrawer() { UI.drawer = null; const d = $('#drawer'); if (d) d.classList.add('hidden'); updateHUD(); }
 function renderDrawer() {
@@ -502,20 +354,26 @@ function renderDrawer() {
   const p = P();
   const body = $('#drawer .dbody');
   const sc = body.scrollTop;
-  $('#drawer .dtitle').textContent = UI.drawer === 'sett' ? `${UI.settMarket ? '🏪' : '🛡️'} ${G.titles[UI.sett].name}` : UI.drawer === 'hold' ? `🏗️ ${G.titles[UI.hold].name}` : drawerTitle(UI.drawer);
-  body.innerHTML = { aile: tabAile, ben: tabBen, kisiler: tabKisiler, ordu: tabOrdu, topraklar: tabToprak, dunya: tabDunya, eylem: tabEylem, gunluk: tabGunluk, sett: settlementPanel, hold: holdPanel }[UI.drawer](p);
+  $('#drawer .dtitle').textContent = drawerTitle(UI.drawer);
+  body.innerHTML = { aile: tabAile, ben: tabBen, kisiler: tabKisiler, dunya: tabDunya, eylem: tabEylem, gunluk: tabGunluk }[UI.drawer](p);
   body.scrollTop = sc;
   body.querySelectorAll('[data-open]').forEach(b => b.onclick = e => { e.stopPropagation(); openSheet(+b.dataset.open); });
   body.querySelectorAll('[data-filter]').forEach(b => b.onclick = () => { UI.filter = b.dataset.filter; renderDrawer(); });
   body.querySelectorAll('[data-act]').forEach(b => b.onclick = () => doAction(b.dataset.act, b.dataset.t ? +b.dataset.t : null));
-  body.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => { const s = G.titles[b.dataset.goto]; closeDrawer(); centerOn(s.x, s.y, 24); const pv = partyProv(s); if (pv) selectProvince(pv.id); });
-  body.querySelectorAll('[data-dis]').forEach(b => b.onclick = () => { const [k, n] = b.dataset.dis.split(':'); const pp = playerParty(); pp.troops[k] = Math.max(0, pp.troops[k] - +n); if (!pp.troops[k]) delete pp.troops[k]; refreshPanels(); });
+  body.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => { closeDrawer(); gotoSettlement(G.titles[b.dataset.goto]); });
+  body.querySelectorAll('[data-gonat]').forEach(b => b.onclick = () => { const t = natLabelTile(+b.dataset.gonat); closeDrawer(); if (t >= 0) { centerOnTile(t, 14); openPop(t, null, null); } });
   bindTips(body);
   bindRealmUI(body);
-  if (UI.drawer === 'sett') bindSettlement(body);
-  if (UI.drawer === 'ordu') bindArmyTab(body);
   if (UI.drawer === 'aile') bindFamily(body);
 }
+/* Yerleşimi haritada göster ve panelini aç */
+function gotoSettlement(s) {
+  if (!s || s.tile == null || s.tile < 0) return;
+  closeModal();
+  centerOnTile(s.tile, 26);
+  openPop(s.tile, null, null);
+}
+function refreshPanels() { if (UI.drawer) renderDrawer(); if (UI.modal === 'realm') renderRealm(); if (UI.pop) renderPop(); updateHUD(); }
 function personLine(c, p) {
   return `<button class="person" data-open="${c.id}">${avatar(c)}
     <div class="pi"><b>${esc(nm(c))}</b><small>${esc(titleOf(c))} · ${c.age} ${L('yaş', 'yrs')}</small><div class="tags">${tagsFor(p, c)}</div></div>
@@ -541,7 +399,6 @@ function tabBen(p) {
     ${spouse ? personLine(spouse, p) : ''}${lovers.map(l => personLine(l, p)).join('')}${kids.map(k => personLine(k, p)).join('')}
     ${!spouse && !kids.length && !lovers.length ? `<p class="small muted">${L('Henüz bir ailen yok.', 'You have no family yet.')}</p>` : ''}</div>`;
   if (prisoners.length) html += `<div class="card"><h3>⛓️ ${L('Zindanındakiler', 'Your prisoners')}</h3>${prisoners.map(x => personLine(x, p)).join('')}</div>`;
-  html += intimacyCard(p);
   html += myTastesCard(p);
   html += `<div class="card"><h3>🗝️ ${L('Bildiğin sırlar', 'Secrets you know')}</h3>${known.length ? known.map(s => `<p class="secret">• ${esc(secretText(s))}</p>`).join('') : `<p class="small muted">${L('Henüz kimsenin sırrını bilmiyorsun.', 'You know no one\'s secrets yet.')}</p>`}</div>`;
   html += `<div class="card"><h3>🩸 ${L('Senin sırların', 'Your secrets')}</h3>${mySecrets.length ? mySecrets.map(s => `<p class="secret ${s.pub ? 'pub' : ''}">• ${esc(secretText(s))}<small>${s.pub ? L(' (herkes biliyor)', ' (public knowledge)') : L(` (${s.known.length - 1} kişi biliyor)`, ` (${s.known.length - 1} know)`)}</small></p>`).join('') : `<p class="small muted">${L('Vicdanın (şimdilik) temiz.', 'Your conscience is clean (for now).')}</p>`}</div>`;
@@ -568,21 +425,13 @@ function tabKisiler(p) {
     <p class="small muted">${L('Sağdaki sayı onun sana bakışı. Birine dokun: entrika, evlilik, rüşvet, suikast…', 'The number on the right is their opinion of you. Tap someone to scheme, marry, bribe, murder…')}</p>
     ${list.map(c => personLine(c, p)).join('') || `<p class="muted">${L('Kimse yok.', 'Nobody.')}</p>`}`;
 }
-function tabToprak(p) {
-  const own = settlementsOf(p);
-  const r = ownRealm(p);
-  let html = '';
-  if (r) html += `<div class="card"><h3>${swatch(r.color)} ${esc(r.name)}</h3><p class="small">${realmSettlements(r).length} ${L('yerleşim', 'holdings')} · ${L('Vasallar', 'Vassals')}: ${living().filter(x => x.lordId === p.id && x.titles.length).length} · ${L('Savaşlar', 'Wars')}: ${enemiesOf(r).map(e => esc(e.name)).join(', ') || L('yok', 'none')}</p></div>`;
-  if (!own.length) return html + `<p class="muted">${L('Hiç toprağın yok. Efendinden toprak iste, düşman kalelerini kuşat ya da toprak sahibi biriyle evlen.', 'You hold no land. Ask your liege for land, besiege enemy castles, or marry into a landed family.')}</p>`;
-  html += `<p class="small muted">${L('Bir yerleşime dokun: binalar, vergi ve huzur.', 'Tap a holding to manage buildings, taxes and order.')}</p>`;
-  html += own.map(s => holdingCard(s, p)).join('');
-  return html;
-}
 function tabDunya(p) {
-  const rs = realms().sort((a, b) => realmSettlements(b).length - realmSettlements(a).length);
-  const wars = G.wars.map(w => `<p class="small">⚔️ ${swatch(G.titles[w.a].color)}${esc(G.titles[w.a].name)} × ${swatch(G.titles[w.b].color)}${esc(G.titles[w.b].name)}</p>`).join('');
-  return `<div class="card"><h3>${L('Süren savaşlar', 'Ongoing wars')}</h3>${wars || `<p class="small muted">${L('Dünya şimdilik barış içinde.', 'The world is at peace — for now.')}</p>`}</div>
-    ${rs.map(r => { const k = ch(r.holder); return `<button class="person" ${k ? `data-open="${k.id}"` : ''}><i class="sw big" style="background:${r.color}"></i><div class="pi"><b>${esc(r.name)}</b><small>${k ? esc(nm(k)) : '—'} · ${realmSettlements(r).length} ${L('yerleşim', 'holdings')}</small></div>${k && k.id !== p.id ? opBadge(opinion(k, p)) : ''}</button>`; }).join('')}`;
+  const me = myNatIdx();
+  const list = G.nat.filter(n => n.alive && NR[n.i].tiles).sort((a, b) => NR[b.i].tiles - NR[a.i].tiles);
+  const wars = G.wars.map(w => `<p class="small">⚔️ ${flagHtml(G.titles[w.a], 12)}${esc(G.titles[w.a].name)} × ${flagHtml(G.titles[w.b], 12)}${esc(G.titles[w.b].name)}</p>`).join('');
+  return `<div class="card"><h3>${L('Süren savaşlar', 'Ongoing wars')}</h3>${wars || `<p class="small muted">${L('Krallıklar şimdilik barış içinde.', 'The realms are at peace — for now.')}</p>`}
+    <p class="small muted">${L('Kabileler (botlar) herkese saldırır ve herkes onlara saldırabilir.', 'Tribes attack anyone, and anyone may attack them.')}</p></div>
+    ${list.slice(0, 80).map((n, i) => { const k = natRuler(n); return `<div class="person ${n.i === me ? 'me' : ''}"><b class="rank">${i + 1}</b>${flagHtml(natFlagObj(n), 22)}<div class="pi"><b>${esc(natName(n))}</b><small>${(landShare(n.i) * 100).toFixed(2)}% · ⚔ ${fmtCount(n.troops)}${k ? ' · ' + esc(nm(k)) : ''}</small><div class="tags">${me >= 0 ? relTag(me, n.i) : ''}</div></div><span class="ab"><button data-gonat="${n.i}" title="${L('Haritada göster', 'Show on map')}">📍</button>${k ? `<button data-open="${k.id}">👤</button>` : ''}</span></div>`; }).join('')}`;
 }
 function actionButton(a, p, t) {
   if (!a.show(p, t)) return '';
@@ -612,8 +461,8 @@ function renderSheet() {
   const parts = self ? [] : opinionParts(t, p);
   const secrets = self ? [] : G.secrets.filter(s => (s.actor === t.id || s.target === t.id) && knows(p, s));
   const kids = t.children.map(ch).filter(k => k && (k.alive || familyRel(p, k)));
-  const pt = partyOf(t);
   const r = realmOf(t);
+  const tn = natOfRealm(ownRealm(t));
   const acts = !self && t.alive && !G.over ? ACTIONS.filter(a => a.tgt).map(a => actionButton(a, p, t)).join('') : '';
   showModal(`<div class="sheet two">
     <button class="x" data-close>✕</button>
@@ -626,21 +475,19 @@ function renderSheet() {
       ${!self && t.alive ? `<div class="rel" data-bd><div><small>${L('Sana bakışı', 'Opinion of you')}</small>${opBadge(o)}</div><div><small>${L('Senin ona', 'Yours of them')}</small>${opBadge(mine)}</div><span class="small muted">${UI.breakdown ? '▲' : L('▼ neden?', '▼ why?')}</span></div>
         ${UI.breakdown ? `<div class="bd">${parts.length ? parts.map(([l, v]) => `<p><span>${esc(l)}</span>${opBadge(v)}</p>`).join('') : `<p class="muted">${L('Henüz bir fikri yok.', 'No opinion yet.')}</p>`}</div>` : ''}` : ''}
       <div class="chips">${traitChips(t)}</div>${statGrid(t)}
-      <p class="small">💰 ${t.gold} · ⭐ ${Math.round(t.prestige)} · ❤️ ${Math.round(t.health)}${pt ? ` · 🪖 ${troopCount(pt)} ${L('asker', 'men')}` : ''}</p>
+      <p class="small">💰 ${t.gold} · ⭐ ${Math.round(t.prestige)} · ❤️ ${Math.round(t.health)}${tn ? ` · ⚔ ${fmtCount(tn.troops)}` : ''}</p>
       <div class="links">
         ${lord ? `<p>${L('Efendisi', 'Liege')}: <a data-open="${lord.id}">${esc(nm(lord))}</a></p>` : ''}
         ${spouse ? `<p>${L('Eşi', 'Spouse')}: <a data-open="${spouse.id}">${esc(nm(spouse))}</a></p>` : ''}
         ${t.prisonerOf ? `<p>⛓️ ${L('Esir tutan', 'Held by')}: <a data-open="${t.prisonerOf}">${esc(nm(ch(t.prisonerOf)))}</a></p>` : ''}
         ${settlementsOf(t).length ? `<p>${L('Toprakları', 'Holdings')}: ${settlementsOf(t).map(s => `<a data-goto="${s.id}">${esc(s.name)}</a>`).join(', ')}</p>` : ''}
         ${kids.length ? `<p>${L('Çocukları', 'Children')}: ${kids.map(k => `<a data-open="${k.id}">${esc(k.name)}${k.alive ? '' : '†'}</a>`).join(', ')}</p>` : ''}
-        ${pt ? `<p><a data-showparty="${pt.id}">📍 ${L('Ordusunu haritada göster', 'Show army on map')}</a></p>` : ''}
+        ${tn ? `<p><a data-gonat="${tn.i}">📍 ${L('Krallığını haritada göster', 'Show their realm on the map')}</a></p>` : ''}
       </div>
       ${secrets.length ? `<div class="card inner"><h3>🗝️ ${L('Bildiğin sırlar', 'Secrets you know')}</h3>${secrets.map(s => `<p class="secret ${s.pub ? 'pub' : ''}">• ${esc(secretText(s))}</p>`).join('')}</div>` : ''}
       ${!self ? sheetTastes(t) : ''}
-      ${intimacyCard(t)}
     </div>
     ${acts ? `<div class="scol"><button class="talkbig" data-talk ${G.ap < 1 ? 'disabled' : ''}><span>💬</span><b>${L('Konuş', 'Talk')}</b><small>${G.ap < 1 ? L('Bu ay vaktin kalmadı', 'No time left this month') : L('Sohbet, dedikodu, hediye, rica, flört… (1⚡)', 'Conversation, gossip, gifts, requests, flirting… (1⚡)')}</small></button>
-      ${isGrown(t) && isGrown(p) ? `<button class="talkbig night" data-bed ${bedReq(p, t) ? 'disabled' : ''}><span>🌙</span><b>${L('Odana davet et', 'Invite to your chambers')}</b><small>${bedReq(p, t) || L(`Mahrem bir gece · kabul şansı %${bedChance(p, t)} (1⚡)`, `An intimate night · ${bedChance(p, t)}% chance they accept (1⚡)`)}</small></button>` : ''}
       <h3>${L('Ne yapacaksın?', 'What will you do?')} <small class="muted">(${G.ap} ⚡)</small></h3><div class="acts">${acts}</div></div>` : ''}
   </div>`, 'sheet');
   const m = $('#modal');
@@ -648,9 +495,8 @@ function renderSheet() {
   m.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openSheet(+b.dataset.open));
   m.querySelectorAll('[data-act]').forEach(b => b.onclick = () => doAction(b.dataset.act, +b.dataset.t));
   const tk = m.querySelector('[data-talk]'); if (tk) tk.onclick = () => { closeModal(); openDialogue(t.id); };
-  const bedB = m.querySelector('[data-bed]'); if (bedB) bedB.onclick = () => { closeModal(); openIntimacy(t.id); };
-  m.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => { const s = G.titles[b.dataset.goto]; closeModal(); closeDrawer(); centerOn(s.x, s.y, 24); const pv = partyProv(s); if (pv) selectProvince(pv.id); });
-  m.querySelectorAll('[data-showparty]').forEach(b => b.onclick = () => { const x = G.parties.find(q => q.id === +b.dataset.showparty); closeModal(); closeDrawer(); if (x) { centerOn(x.x, x.y, 24); selectProvince(partyProv(x).id); } });
+  m.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => { closeDrawer(); gotoSettlement(G.titles[b.dataset.goto]); });
+  m.querySelectorAll('[data-gonat]').forEach(b => b.onclick = () => { const tt = natLabelTile(+b.dataset.gonat); closeModal(); closeDrawer(); if (tt >= 0) { centerOnTile(tt, 14); openPop(tt, null, null); } });
   bindTips(m);
   const bd = m.querySelector('[data-bd]');
   if (bd) bd.onclick = () => { UI.breakdown = !UI.breakdown; renderSheet(); };
@@ -716,7 +562,7 @@ function closeModal() {
   UI.modal = null; UI.sheet = null;
 }
 function processQueue() {
-  if (UI.modal === 'event' || UI.modal === 'confirm' || BT || !G) return;
+  if (UI.modal === 'event' || UI.modal === 'confirm' || !G) return;
   if (G.over) { closeModal(); return renderGameOver(); }
   while (G.queue.length) {
     const q = G.queue[0], ev = EVENTS[q.id], p = P();
@@ -756,7 +602,7 @@ function openMenu() {
   const uiStep = d => { setUIScale(UI_SCALE + d); $('#uiVal').textContent = Math.round(UI_SCALE * 100) + '%'; };
   $('#uiMinus').onclick = () => uiStep(-0.1);
   $('#uiPlus').onclick = () => uiStep(0.1);
-  bindLang(m, () => { G.terrDirty = true; $('#hudL')._h = $('#hudR')._h = $('#ctxbar')._h = $('#endturn')._h = null; updateHUD(); openMenu(); });
+  bindLang(m, () => { G.terrDirty = true; for (const h of ['#hudL', '#hudR', '#ctrl', '#atks', '#lb', '#pop']) { const e = $(h); if (e) e._h = null; } buildTools(); updateHUD(); openMenu(); });
   $('#mFull').onclick = () => {
     const el = document.documentElement;
     const req = el.requestFullscreen || el.webkitRequestFullscreen;
@@ -769,36 +615,30 @@ function openMenu() {
   $('#mNew').onclick = () => askConfirm(L('Mevcut oyunun silinecek.', 'Your current game will be deleted.'), () => { deleteSave(); G = null; closeDrawer(); renderSetup(); }, () => {});
   $('#mHelp').onclick = () => {
     showModal(`<div class="sheet"><button class="x" data-close>✕</button><h2>❓ ${L('Nasıl oynanır?', 'How to play')}</h2><div class="help">${L(`
-      <p><b>👑 Hükümdar:</b> Oyuna her zaman bir krallığın hükümdarı olarak başlarsın. Haritada gezmezsin; sarayından hükmeder, emirlerini haritadan ve krallık ekranından verirsin.</p>
-      <p><b>🗺️ İller:</b> Haritada bir ile ya da şehre dokun; solda il paneli açılır. Sahibi, garnizonu, geliri, huzuru ve binaları görünür; altta <b>Seçenekler</b> listesinde orada yapabileceğin her şey yazar. Denize ya da aynı ile yeniden dokununca panel kapanır.</p>
-      <p><b>🏰 Kendi toprağın:</b> bina yap, vergiyi ayarla, asker topla, garnizonu güçlendir, pazardan hediye al ya da toprağı bir saraylına bağışla.</p>
-      <p><b>🏯 Vasalının toprağı:</b> onunla konuş, ödüllendir ya da unvanını geri al (suçunu bilmiyorsan zorbalık sayılır).</p>
-      <p><b>🌍 Yabancı toprak:</b> elçi gönder, savaş ilan et, barış teklif et. Savaştaysan "Kuşat" de: kraliyet ordusu oraya yürür ve kendiliğinden kuşatmaya başlar.</p>
-      <p><b>⚔️ Kraliyet ordusu:</b> Ordunu mareşalin yönetir (meclisten ata). Ordu sekmesinden asker toplar, terhis eder ya da başkente geri çağırırsın. Düşmanla karşılaşınca savaşır, mareşale bırakır ya da çekilirsin.</p>
-      <p><b>⏳ Turlar:</b> Her tur ${TURN_DAYS} gün sürer. Hazır olunca sağ alttaki <b>TURU BİTİR</b>'e bas.</p>
-      <p><b>👑 Krallık ekranı:</b> Genel bakış, meclis, yasalar, kararlar, diplomasi ve vasallar. Sol üstteki bayrağa dokunarak da açılır.</p>
+      <p><b>⏱️ Gerçek zaman:</b> Dünya durmadan akar; bütün krallıklar ve kabileler aynı anda genişler. Sağ üstten duraklatabilir ya da hızlandırabilirsin. Menüler ve olaylar açıkken zaman durur.</p>
+      <p><b>⚔️ Asker ve saldırı:</b> Askerlerin kendiliğinden çoğalır; sınırın toprağınla ve kasabalarınla büyür. Alttaki çubuk her saldırıya giden asker oranını belirler. Sahipsiz ya da düşman toprağa dokun, <b>Saldır</b> de: askerlerin ortak sınır boyunca karış karış ilerler. Dağlar ve kaleler ilerlemeyi yavaşlatır. Saldırı listesindeki ✕ ile geri çekilirsin (%25 kayıp).</p>
+      <p><b>⛵ Çıkarma:</b> Deniz aşırı ya da sınırın olmayan bir toprağa gemiyle asker indir. Aynı anda en çok 3 gemi.</p>
+      <p><b>🏗️ Yapılar:</b> Kendi toprağına dokun. <b>Kasaba</b> asker sınırını ve geliri artırır (üstüne kurarak seviye atlar), <b>liman</b> ticaret gemileri ve kadırga sağlar, <b>kale</b> çevresini korur, <b>mancınık atölyesi</b> ateş saldırısı fırlatır, <b>gözcü kulesi</b> gelen ateşi düşürür.</p>
+      <p><b>🔥 Ateş saldırıları:</b> Atölyen varsa düşman toprağına Rum ateşi, büyük ateş ya da ateş yağmuru gönder: alan yanar, toprak sahipsiz kalır, askerler ölür. Herkes bundan nefret eder.</p>
+      <p><b>🕊️ Diplomasi:</b> Bir krallığın toprağına dokun: barış, ittifak, asker ve altın yardımı, hükümdarla konuşma. Müttefiklere saldırılamaz. Kabilelerle diplomasi olmaz.</p>
+      <p><b>👑 Krallık ekranı:</b> Meclis, yasalar (vergi altını, yükümlülük asker sınırını değiştirir), kararlar, diplomasi ve vasallar.</p>
+      <p><b>🏰 Yerleşimler:</b> Haritadaki tarihî şehir ve kaleler unvandır. Fethedilen yerleşim hükümdarına geçer; dilersen vasallarına bağışlarsın.</p>
       <p><b>🗡️ Entrika:</b> Birinin kartını aç: evlilik, baştan çıkarma, rüşvet, şantaj, suikast, iftira… Her ay ${AP_MAX} hakkın var.</p>
       <p><b>💬 Konuşmalar:</b> Herkesin sevdiği ve sevmediği hobileri, eşyaları ve etkinlikleri var. Başkaları hakkında söylediklerin kulaktan kulağa yayılır.</p>
-      <p><b>⚔️ Taktik savaş:</b> Önce diziliş seç; her tur bir emir ver. Her taktik ikisini yener, ikisine yenilir (▲/▼). Kuşatmada koçbaşı, mancınık ve lağımla surları yık.</p>
-      <p><b>🌍 Dünya:</b> Harita tüm dünyayı kapsar: Avrupa'dan Song Çin'ine, Japonya'dan Gana'ya ve Toltek Tollan'ına kadar 47 krallık.</p>
-      <p><b>🌳 Aile:</b> Aile sekmesinde soy ağacın, gebelikler, sevgililer ve piç çocukların görünür. Çocuklarına evlilik ayarlayabilirsin.</p>
-      <p><b>🌙 Mahrem:</b> Yetişkin (18+) biriyle — eşin, sevgilin ya da saraydaki herhangi biri — bir gece geçirmeyi teklif edebilirsin. Herkesin kendi arzusu, hüneri, yönelimi ve zevkleri vardır; sevdiği bir yaklaşım bağları güçlendirir, sevmediği ilişkiyi bozar. Çocuk istemek, şansa bırakmak ya da önlem almak senin elinde. Dedikodu, yakalanma ve hastalık riski vardır.</p>
-      <p><b>☠️ Ölüm:</b> Ölünce varisinle devam edersin. Varisin yoksa hanedan biter.</p>`, `
-      <p><b>👑 Ruler:</b> You always begin as the ruler of a realm. You do not wander the map: you rule from your court and give orders through the map and the realm screen.</p>
-      <p><b>🗺️ Provinces:</b> Tap a province or city on the map and the province panel opens on the left. It shows the holder, garrison, income, unrest and buildings; the <b>Options</b> list below shows everything you can do there. Tap the sea or the same province again to close it.</p>
-      <p><b>🏰 Your holdings:</b> build, set taxes, raise troops, reinforce the garrison, buy gifts at the market, or grant the holding to a courtier.</p>
-      <p><b>🏯 A vassal's holding:</b> talk to them, reward them, or revoke the title (tyranny unless you know of a crime).</p>
-      <p><b>🌍 Foreign land:</b> send envoys, declare war, offer peace. At war, choose "Besiege": the royal army marches there and lays siege on its own.</p>
-      <p><b>⚔️ Royal army:</b> your marshal leads it (appoint one in the council). From the Army tab you raise and dismiss troops or recall the army to the capital. When it meets an enemy you fight, leave it to the marshal, or withdraw.</p>
-      <p><b>⏳ Turns:</b> Each turn lasts ${TURN_DAYS} days. When ready, press <b>END TURN</b> at the bottom right.</p>
-      <p><b>👑 Realm screen:</b> overview, council, laws, decisions, diplomacy and vassals. Tap the flag at the top left to open it too.</p>
+      <p><b>🌳 Aile:</b> Soy ağacın, gebelikler, sevgililer ve piç çocuklar. Çocuklarına evlilik ayarlayabilirsin.</p>
+      <p><b>🏆 Zafer ve ölüm:</b> Karaların %80'ine hükmedersen dünyanın efendisi olursun. Ölünce varisinle devam edersin; varisin yoksa ya da krallığın haritadan silinirse hanedan biter.</p>`, `
+      <p><b>⏱️ Real time:</b> The world never stops: every realm and tribe expands at once. Pause or speed up at the top right. Time stops while menus and events are open.</p>
+      <p><b>⚔️ Troops and attacks:</b> Your troops grow on their own; the cap rises with your land and towns. The bar at the bottom sets what share of your troops each attack takes. Tap unclaimed or enemy land and press <b>Attack</b>: your troops push forward along the shared border. Mountains and forts slow the advance. Tap ✕ in the attack list to retreat (25% lost).</p>
+      <p><b>⛵ Landings:</b> Ship troops to land across the sea, or anywhere you share no border. At most 3 ships at once.</p>
+      <p><b>🏗️ Buildings:</b> Tap your own land. A <b>town</b> raises your troop cap and income (build on it again to level it up), a <b>harbour</b> brings trade ships and galleys, a <b>fort</b> guards its surroundings, a <b>siege workshop</b> launches fire strikes, and a <b>watchtower</b> shoots down incoming fire.</p>
+      <p><b>🔥 Fire strikes:</b> With a workshop you can hurl Greek fire, a great blaze or a rain of fire onto enemy land: the area burns, the land is left unclaimed and troops die. Everyone hates it.</p>
+      <p><b>🕊️ Diplomacy:</b> Tap a realm's land: peace, alliance, troop and gold aid, or talk to its ruler. Allies cannot be attacked. Tribes do not negotiate.</p>
+      <p><b>👑 Realm screen:</b> council, laws (taxes change gold, levies change your troop cap), decisions, diplomacy and vassals.</p>
+      <p><b>🏰 Holdings:</b> The historical cities and castles on the map are titles. A conquered holding passes to its realm's ruler; you may grant it to your vassals.</p>
       <p><b>🗡️ Intrigue:</b> Open someone's card: marriage, seduction, bribes, blackmail, murder, slander… You get ${AP_MAX} actions each month.</p>
       <p><b>💬 Conversations:</b> Everyone has hobbies, goods and activities they love or hate. What you say about others travels from ear to ear.</p>
-      <p><b>⚔️ Tactical battle:</b> Pick a formation, then give one order per round. Each tactic beats two and loses to two (▲/▼). In sieges, break the walls with rams, trebuchets and mines.</p>
-      <p><b>🌍 World:</b> The map covers the whole world: 47 realms from Europe to Song China, from Japan to Ghana and Toltec Tollan.</p>
-      <p><b>🌳 Family:</b> The Family tab shows your family tree, pregnancies, lovers and bastards. You can arrange marriages for your children.</p>
-      <p><b>🌙 Intimacy:</b> You can invite an adult (18+) — your spouse, a lover, or anyone at court — to spend the night. Everyone has their own desire, skill, orientation and tastes; an approach they enjoy deepens the bond, one they dislike harms it. Try for a child, leave it to fate, or take precautions. Gossip, getting caught and disease are real risks.</p>
-      <p><b>☠️ Death:</b> When you die you continue as your heir. With no heir, your dynasty ends.</p>`)}</div></div>`, 'menu');
+      <p><b>🌳 Family:</b> Your family tree, pregnancies, lovers and bastards. You can arrange marriages for your children.</p>
+      <p><b>🏆 Victory and death:</b> Rule 80% of all land to become master of the world. When you die you continue as your heir; with no heir, or if your realm is wiped from the map, your dynasty ends.</p>`)}</div></div>`, 'menu');
     $('#modal').querySelector('[data-close]').onclick = closeModal;
   };
 }
@@ -864,7 +704,7 @@ window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => { reg.update().catch(() => {}); }).catch(() => {});
     let reloaded = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (!hadCtrl || reloaded || UI.screen === 'game' && (G && G.turnLeft > 0)) return;
+      if (!hadCtrl || reloaded) return;
       if (!BOOTED) return; // açılış sürerken yenileme döngüsüne girme
       reloaded = true; saveGame && G && saveGame(); location.reload();
     });

@@ -6,6 +6,7 @@
    ========================================================= */
 
 const pct = n => Math.round(clamp(n, 0, 100));
+const mercSize = n => Math.round(Math.max(800, maxTroops(n) * 0.08));
 function jailReq(p, t) {
   if (p.prisonerOf && (!t || t.id !== p.prisonerOf)) return L('Zindandasın', 'You are imprisoned');
   if (t && t.prisonerOf && t.prisonerOf !== p.id) return L('O zindanda', 'They are imprisoned');
@@ -72,7 +73,7 @@ const ACTIONS = [
   },
   {
     id: 'bastan', get ad() { return L('Baştan çıkar', 'Seduce'); }, icon: '🌹', ap: 1, tgt: true,
-    show: (p, t) => isGrown(p) && isGrown(t) && !p.lovers.includes(t.id) && p.spouseId !== t.id,
+    show: (p, t) => isGrown(p) && isGrown(t) && !closeKin(p, t) && !p.lovers.includes(t.id) && p.spouseId !== t.id,
     req: (p, t) => firstReq(jailReq(p, t), t.prisonerOf ? L('Esaret altında rıza olmaz', 'No consent in captivity') : null, !attracted(t, p) ? L('Sana o gözle bakmıyor', 'Not drawn to you that way') : null),
     chance: (p, t) => seduceChance(p, t),
     run(p, t) {
@@ -407,6 +408,7 @@ const ACTIONS = [
       const oldR = realmOf(t);
       taken.forEach(tt => { giveTitle(tt, p); tt.liege = r ? r.id : null; });
       refreshLieges();
+      if (r && oldR && oldR !== r) carveNation(r, taken.map(x => x.id), 8);
       if (oldR && oldR !== r) checkRealmDeath(oldR);
       G.terrDirty = true;
       addOp(t, p, -50);
@@ -416,14 +418,14 @@ const ACTIONS = [
   },
   {
     id: 'savas', ad: (p, t) => L(`Savaş ilan et: ${t && ownRealm(t) ? ownRealm(t).name : ''}`, `Declare war: ${t && ownRealm(t) ? ownRealm(t).name : ''}`), icon: '⚔️', ap: 1, tgt: true,
-    confirm: t => L(`${ownRealm(t).name} ile savaşa gireceksin. Orduları senin topraklarına yürüyecek.`, `You will go to war with the ${ownRealm(t).name}. Their armies will march on your lands.`),
+    confirm: t => L(`${ownRealm(t).name} ile savaşa gireceksin. Askerleri sınırlarına saldırabilir.`, `You will go to war with the ${ownRealm(t).name}. Their troops may strike your borders.`),
     show: (p, t) => !!ownRealm(p) && !!ownRealm(t) && ownRealm(p) !== ownRealm(t) && !atWarRealms(ownRealm(p), ownRealm(t)),
     req: (p, t) => jailReq(p, t),
-    info: (p, t) => L(`Gücün ~${Math.round(charPower(p))} · Onun ~${Math.round(charPower(t))}`, `Your strength ~${Math.round(charPower(p))} · Theirs ~${Math.round(charPower(t))}`),
+    info: (p, t) => L(`Askerin ~${fmtCount(charPower(p))} · Onun ~${fmtCount(charPower(t))}`, `Your troops ~${fmtCount(charPower(p))} · Theirs ~${fmtCount(charPower(t))}`),
     run(p, t) {
       declareWar(ownRealm(p), ownRealm(t));
       addOp(t, p, -40);
-      return L(`Savaş borazanları çaldı! ${ownRealm(t).name} ile savaştasın. Şehirlerini kuşat, ordularını ez.`, `The war horns sound! You are at war with the ${ownRealm(t).name}. Besiege their cities, crush their armies.`);
+      return L(`Savaş borazanları çaldı! ${ownRealm(t).name} ile savaştasın. Sınırlarına dokun ve saldır.`, `The war horns sound! You are at war with the ${ownRealm(t).name}. Tap their border and attack.`);
     },
   },
   {
@@ -612,14 +614,14 @@ const ACTIONS = [
   },
   {
     id: 'parali', get ad() { return L('Paralı asker kirala (150💰)', 'Hire mercenaries (150💰)'); }, icon: '🪖', ap: 1,
-    show: p => !!playerParty(),
+    show: p => !!natOfRealm(ownRealm(p)),
     req: p => firstReq(jailReq(p), goldReq(p, 150)),
+    info: p => { const n = natOfRealm(ownRealm(p)); return n ? L(`+${fmtCount(mercSize(n))} asker`, `+${fmtCount(mercSize(n))} troops`) : ''; },
     run(p) {
-      const pt = playerParty();
+      const n = natOfRealm(ownRealm(p)), add = mercSize(n);
       p.gold -= 150;
-      const add = CULTURES[localCulture()].east ? { piyade: 12, atliokcu: 10 } : { piyade: 14, okcu: 8, atli: 4 };
-      for (const k in add) pt.troops[k] = (pt.troops[k] || 0) + add[k];
-      return L(`Paralı bir bölük sancağının altına geçti: ${lossText(add)}.`, `A mercenary company joined your banner: ${lossText(add)}.`);
+      n.troops += add;
+      return L(`Paralı bir bölük sancağının altına geçti: <b>${fmtCount(add)}</b> asker.`, `A mercenary company joined your banner: <b>${fmtCount(add)}</b> troops.`);
     },
   },
   {
