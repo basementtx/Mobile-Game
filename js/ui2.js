@@ -1,66 +1,22 @@
 'use strict';
 /* =========================================================
-   Crown & Dagger — Arayüz: topraklar ve binalar, pazar,
-   zevkler, krallık yönetimi (meclis, yasalar, kararlar,
-   diplomasi, vasallar)
+   Crown & Dagger — Arayüz: pazar, zevkler, krallık yönetimi
+   (meclis, yasalar, kararlar, diplomasi, vasallar)
    ========================================================= */
 
-const unrestCls = u => (u > 60 ? 'bad' : u > 35 ? 'mid' : 'good');
-function lvlPips(lv, max) { return `<span class="lpips">${'<i class="on"></i>'.repeat(lv)}${'<i></i>'.repeat(Math.max(0, max - lv))}</span>`; }
-function bIcons(s) { return BKEYS.filter(k => bl(s, k)).map(k => `<span class="bico" data-tip="${esc(BUILDINGS[k].ad(s) + ' ' + ROMAN[bl(s, k)])}">${BUILDINGS[k].i}<sub>${bl(s, k)}</sub></span>`).join(''); }
-function holdingCard(s, p) {
-  const inc = settIncome(s, p);
-  return `<button class="card hold" data-hold="${s.id}">
-    <div class="hrow"><b>${s.kind === 'sehir' ? '🏙️' : '🏰'} ${esc(s.name)}${s.capital ? ' ★' : ''}</b><span class="small">${inc >= 0 ? '+' : ''}${inc}💰/${L('ay', 'mo')}</span></div>
-    <div class="hstats small"><span>${L('Refah', 'Prosperity')} %${Math.round((s.prosperity || 1) * 100)}</span><span>${L('Nüfus', 'Pop.')} ${Math.round(s.pop || 0)}k</span><span class="${unrestCls(s.unrest || 0)}">${L('Huzursuzluk', 'Unrest')} %${Math.round(s.unrest || 0)}</span><span>${L('Garnizon', 'Garrison')} ${s.garrison}/${garrisonMax(s)}</span><span>${L('Vergi', 'Tax')}: ${TAX_NAMES()[s.tax ?? 1]}</span>${isCoastal(s) ? `<span>⚓ ${L('Kıyı', 'Coastal')}</span>` : ''}</div>
-    <div class="bicons">${bIcons(s) || `<span class="muted small">${L('Henüz bina yok', 'No buildings yet')}</span>`}</div>
-    ${s.q ? `<div class="qline small">🏗️ ${esc(BUILDINGS[s.q.k].ad(s))} ${ROMAN[s.q.lvl]} · ${s.q.left} ${L('gün', 'days')}${bar(s.q.tot - s.q.left, s.q.tot)}</div>` : ''}
-    ${s.siege ? `<div class="bad small">🔥 ${L('KUŞATMADA', 'UNDER SIEGE')}</div>` : ''}</button>`;
-}
-function settBuildingsLine(s) {
-  const ic = bIcons(s);
-  return ic ? `<div class="card inner"><p class="small muted">${L('Binalar', 'Buildings')}</p><div class="bicons">${ic}</div></div>` : '';
-}
-function speedCost(s) { if (!s.q) return 0; const B = BUILDINGS[s.q.k]; return Math.max(10, Math.round(B.cost[s.q.lvl - 1] * 0.6 * s.q.left / s.q.tot)); }
-function holdPanel(p) {
-  const s = G.titles[UI.hold];
-  if (!s) return '';
-  const mine = s.holder === p.id;
-  const parts = settIncomeParts(s, p);
-  let html = `<div class="card"><div class="hrow"><b>${s.kind === 'sehir' ? L('Şehir', 'City') : L('Kale', 'Castle')}${s.capital ? ' · ' + L('Başkent', 'Capital') : ''}${isCoastal(s) ? ' · ⚓' : ''}</b><button class="mini" data-goto="${s.id}">📍</button></div>
-    <div class="meters"><div><small>${L('Refah', 'Prosperity')} %${Math.round((s.prosperity || 1) * 100)}</small>${bar(s.prosperity || 1, 1.6, 'hp')}</div><div><small>${L('Huzursuzluk', 'Unrest')} %${Math.round(s.unrest || 0)}</small>${bar(s.unrest || 0, 100, 'st')}</div></div>
-    <p class="small">${L('Nüfus', 'Population')} ~${Math.round(s.pop || 0)}.000 · ${L('Garnizon', 'Garrison')} ${s.garrison}/${garrisonMax(s)} · ${L('Sur savunması', 'Wall defence')} ×${wallMult(s).toFixed(1)}</p>
-    <div class="ibreak">${parts.map(([l, v]) => `<span>${esc(l)} <b class="${v < 0 ? 'bad' : ''}">${v > 0 ? '+' : ''}${v}</b></span>`).join('')}<span>= <b>${settIncome(s, p)}💰/${L('ay', 'mo')}</b></span></div></div>`;
-  if (mine) {
-    html += `<h3>🪙 ${L('Vergi oranı', 'Tax rate')}</h3><div class="seg taxseg">${TAX_NAMES().map((n, i) => `<button data-tax="${i}" class="${(s.tax ?? 1) === i ? 'on' : ''}">${n}<small>×${TAX_MULT[i]} · ${TAX_UNREST[i] > 0 ? '+' : ''}${TAX_UNREST[i]}/${L('ay', 'mo')}</small></button>`).join('')}</div>
-      <p class="small muted">${L('Yüksek vergi geliri artırır ama huzursuzluğu körükler. %75 üstünde halk ayaklanabilir.', 'High taxes raise income but stoke unrest. Above 75% the people may revolt.')}</p>`;
-  }
-  if (s.q) html += `<div class="card inner"><b>🏗️ ${esc(BUILDINGS[s.q.k].ad(s))} ${ROMAN[s.q.lvl]}</b> · ${s.q.left} ${L('gün kaldı', 'days left')}${bar(s.q.tot - s.q.left, s.q.tot)}
-    ${mine ? `<button class="wide" data-speed="${s.id}" ${p.gold < speedCost(s) ? 'disabled' : ''}>⏩ ${L(`Ustaları hızlandır (${speedCost(s)}💰): hemen bitir`, `Hurry the masons (${speedCost(s)}💰): finish now`)}</button>` : ''}</div>`;
-  html += `<h3>🏗️ ${L('Binalar', 'Buildings')}</h3><div class="blist">`;
-  for (const k of BKEYS) {
-    const B = BUILDINGS[k], lv = bl(s, k);
-    const why = mine ? canBuild(s, k) : L('Senin toprağın değil', 'Not your holding');
-    const cost = lv < B.max ? buildCost(s, k) : 0;
-    const off = !!why || p.gold < cost || !free(p);
-    html += `<div class="brow2 ${lv ? 'has' : ''}"><span class="ri">${B.i}</span><span class="rn"><b>${esc(B.ad(s))}</b> ${lvlPips(lv, B.max)}<small>${esc(B.d(s))}</small>${lv < B.max ? `<small class="muted">${cost}💰 · ${buildDays(s, k)} ${L('gün', 'days')} · ${L('bakım', 'upkeep')} ${B.up}/${L('ay', 'mo')}${why ? ` · <em>${esc(why)}</em>` : ''}</small>` : ''}</span>
-      ${mine && lv < B.max ? `<button data-build="${k}" ${off ? 'disabled' : ''}>${lv ? L('Geliştir', 'Upgrade') : L('İnşa et', 'Build')}</button>` : ''}</div>`;
-  }
-  html += '</div>';
-  return html;
-}
 /* ---------- Pazar ---------- */
 function marketStock(s) {
   const keys = Object.keys(ITEMS);
   const r = mulberry32(s.id.length * 977 + monthIndex() * 31 + G.settIds.indexOf(s.id) * 7);
-  const n = 4 + bl(s, 'pazar') + (s.kind === 'sehir' ? 2 : 0) + (bl(s, 'liman') ? 2 : 0);
+  const n = 6 + (s.capital ? 2 : 0) + (s.kind === 'sehir' ? 1 : 0);
   return keys.map(k => [k, r()]).sort((a, b) => a[1] - b[1]).slice(0, Math.min(keys.length, n)).map(x => x[0]);
 }
-function itemPrice(s, k) { return Math.round(ITEMS[k].cost * (1 - 0.06 * bl(s, 'pazar')) * (bl(s, 'han') ? 0.95 : 1)); }
+function itemPrice(s, k) { return ITEMS[k].cost; }
 function marketHtml(s, p) {
-  if (s.kind !== 'sehir' && !bl(s, 'pazar')) return `<p class="small muted">🏪 ${L('Burada pazar yok. Şehirlerde ya da pazarı olan kalelerde hediye alınır.', 'No market here. Gifts are sold in cities or castles with a market.')}</p>`;
+  if (!s) return `<p class="small muted">🏪 ${L('Pazar için bir yerleşimin olmalı.', 'You need a holding to visit a market.')}</p>`;
   const stock = marketStock(s);
-  return `<h3>🏪 ${BUILDINGS.pazar.ad(s)} <small class="muted">(${L('hediyeler', 'gifts')} · ${L('envanter', 'inventory')}: ${(p.inv || []).length})</small></h3><div class="recruit">${stock.map(k => {
+  const east = CULTURES[s.cul] && CULTURES[s.cul].east;
+  return `<h3>🏪 ${esc(s.name)} ${east ? L('çarşısı', 'bazaar') : L('pazarı', 'market')} <small class="muted">(${L('hediyeler', 'gifts')} · ${L('envanter', 'inventory')}: ${(p.inv || []).length})</small></h3><div class="recruit">${stock.map(k => {
     const pr = itemPrice(s, k), mineL = prefOf(p, 'i', k);
     return `<div class="rrow"><span class="ri">${ITEMS[k].i}</span><span class="rn">${esc(ITEMS[k].ad)}<small>${pr}💰${mineL > 0 ? ' · ' + L('sen seversin', 'you like it') : ''}</small></span><button data-buy="${k}" ${p.gold < pr ? 'disabled' : ''}>${L('Al', 'Buy')}</button></div>`;
   }).join('')}</div>
@@ -78,7 +34,7 @@ function myTastesCard(p) {
   return `<div class="card"><h3>🎭 ${L('Zevklerin', 'Your tastes')}</h3><div class="pchips">${all}</div>
     <p class="small muted">${L('Sevdiğin etkinlikler stresini azaltır; ortak zevkler insanları sana yaklaştırır.', 'Activities you love relieve stress; shared tastes draw people to you.')}</p></div>
     <div class="card"><h3>🤝 ${L('Dostların ve rakiplerin', 'Friends and rivals')}</h3>${friends.map(x => personLine(x, p)).join('')}${rivals.map(x => personLine(x, p)).join('')}${!friends.length && !rivals.length ? `<p class="small muted">${L('Henüz yok.', 'None yet.')}</p>` : ''}</div>
-    <div class="card"><h3>🎁 ${L('Envanter', 'Inventory')}</h3>${Object.keys(inv).length ? `<div class="pchips">${Object.entries(inv).map(([k, n]) => `<span class="pchip">${ITEMS[k].i} ${esc(ITEMS[k].ad)}${n > 1 ? ' ×' + n : ''}</span>`).join('')}</div>` : `<p class="small muted">${L('Boş. Şehir pazarlarından hediye alabilirsin.', 'Empty. Buy gifts at city markets.')}</p>`}
+    <div class="card"><h3>🎁 ${L('Envanter', 'Inventory')}</h3>${Object.keys(inv).length ? `<div class="pchips">${Object.entries(inv).map(([k, n]) => `<span class="pchip">${ITEMS[k].i} ${esc(ITEMS[k].ad)}${n > 1 ? ' ×' + n : ''}</span>`).join('')}</div>` : `<p class="small muted">${L('Boş. Krallık ekranındaki pazardan hediye alabilirsin.', 'Empty. Buy gifts at the market in the realm screen.')}</p>`}
     ${debts.length ? `<p class="small">💸 ${L('Borçların', 'Debts')}: ${debts.map(d => `${esc(nm(ch(d.to)))} ${d.amt}💰 (${d.late ? L('GECİKMİŞ', 'OVERDUE') : Math.max(0, d.due - monthIndex()) + L(' ay', ' mo')})`).join(' · ')}</p>` : ''}</div>`;
 }
 function sheetTastes(t) {
@@ -100,10 +56,10 @@ function decisionButtons(p) {
   }).join('');
 }
 /* ---------- Krallık ekranı (CK3 tarzı, sekmeli) ---------- */
-const REALM_TABS = () => [['genel', '👑', L('Genel', 'Overview')], ['meclis', '🏛️', L('Meclis', 'Council')], ['yasalar', '⚖️', L('Yasalar', 'Laws')], ['kararlar', '📜', L('Kararlar', 'Decisions')], ['diplomasi', '🕊️', L('Diplomasi', 'Diplomacy')], ['vasallar', '🏰', L('Vasallar', 'Vassals')]];
+const REALM_TABS = () => [['genel', '👑', L('Genel', 'Overview')], ['meclis', '🏛️', L('Meclis', 'Council')], ['yasalar', '⚖️', L('Yasalar', 'Laws')], ['kararlar', '📜', L('Kararlar', 'Decisions')], ['diplomasi', '🕊️', L('Diplomasi', 'Diplomacy')], ['vasallar', '🏰', L('Vasallar', 'Vassals')], ['pazar', '🏪', L('Pazar', 'Market')]];
 function openRealm(tab) {
-  if (G.turnLeft > 0) return;
   if (tab) UI.realmTab = tab;
+  closePop();
   if (UI.drawer) closeDrawer();
   UI._realmScroll = 0;
   renderRealm();
@@ -114,7 +70,7 @@ function renderRealm() {
   const sc = prev && UI.modal === 'realm' ? prev.scrollTop : 0;
   if (!r) { showModal(`<div class="realmscr"><button class="x" data-close>✕</button>${realmNoCrown(p)}</div>`, 'realm'); bindRealmModal(); return; }
   const tab = REALM_TABS().some(t => t[0] === UI.realmTab) ? UI.realmTab : 'genel';
-  const body = { genel: realmOverview, meclis: realmCouncil, yasalar: realmLaws, kararlar: realmDecisions, diplomasi: realmDiplomacy, vasallar: realmVassals }[tab](p, r);
+  const body = { genel: realmOverview, meclis: realmCouncil, yasalar: realmLaws, kararlar: realmDecisions, diplomasi: realmDiplomacy, vasallar: realmVassals, pazar: realmMarket }[tab](p, r);
   const titles = rulerTitles(r);
   showModal(`<div class="realmscr">
     <header class="rhead" style="--rc:${r.color}">
@@ -134,7 +90,7 @@ function bindRealmModal() {
   m.querySelectorAll('[data-close]').forEach(b => b.onclick = closeModal);
   m.querySelectorAll('[data-rtab]').forEach(b => b.onclick = () => { UI.realmTab = b.dataset.rtab; renderRealm(); const nb = $('#modal .rbody'); if (nb) nb.scrollTop = 0; });
   m.querySelectorAll('[data-open]').forEach(b => b.onclick = e => { e.stopPropagation(); openSheet(+b.dataset.open); });
-  m.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => { const s = G.titles[b.dataset.goto]; closeModal(); centerOn(s.x, s.y, 24); const pv = partyProv(s); if (pv) selectProvince(pv.id); });
+  m.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => gotoSettlement(G.titles[b.dataset.goto]));
   m.querySelectorAll('[data-act]').forEach(b => b.onclick = () => doAction(b.dataset.act, b.dataset.t ? +b.dataset.t : null));
   bindTips(m);
   bindRealmUI(m);
@@ -152,23 +108,30 @@ function realmNoCrown(p) {
 function rstat(v, l, cls, tip) { return `<div ${tip ? `data-tip="${esc(tip)}"` : ''}><b class="${cls || ''}">${v}</b><small>${l}</small></div>`; }
 function realmOverview(p, r) {
   const vas = vassalsOf(p), hs = realmSettlements(r), stab = stabilityOf(p), heir = heirOf(p);
-  const allies = alliesOf(r), wars = enemiesOf(r);
-  const pp = playerParty();
+  const allies = alliesOf(r), wars = enemiesOf(r), n = natOfRealm(r);
   const demesne = settlementsOf(p);
   let html = `<div class="kstats wide">
-    ${rstat(hs.length, L('yerleşim', 'holdings'))}${rstat(vas.length, L('vasal', 'vassals'))}
-    ${rstat((stab > 0 ? '+' : '') + stab, L('vasal sadakati', 'vassal loyalty'), stab < -10 ? 'bad' : stab > 15 ? 'good' : '', L('Vasallarının sana ortalama bakışı', 'Average opinion of your vassals'))}
-    ${rstat(income(p) + '💰', L('aylık gelir', 'monthly income'))}${rstat(pp ? troopCount(pp) : 0, L('kraliyet ordusu', 'royal army'))}${rstat(Math.round(p.prestige), L('şan', 'prestige'))}</div>`;
+    ${rstat(n ? (landShare(n.i) * 100).toFixed(1) + '%' : '—', L('karaların', 'of all land'))}${rstat(n ? fmtCount(n.troops) : 0, L('asker', 'troops'))}
+    ${rstat(n ? '+' + goldRate(n).toFixed(1) + '/s' : '—', L('altın geliri', 'gold income'))}${rstat(hs.length, L('yerleşim', 'holdings'))}${rstat(vas.length, L('vasal', 'vassals'))}
+    ${rstat((stab > 0 ? '+' : '') + stab, L('vasal sadakati', 'vassal loyalty'), stab < -10 ? 'bad' : stab > 15 ? 'good' : '', L('Vasallarının sana ortalama bakışı', 'Average opinion of your vassals'))}${rstat(Math.round(p.prestige), L('şan', 'prestige'))}</div>`;
+  if (n) {
+    const R = NR[n.i]; natBox(n.i);
+    html += `<p class="small muted">${L(`Kasaba seviyesi ${R.towns} · liman ${R.harbors} · kale ${R.forts} · atölye ${R.shops} · gözcü kulesi ${R.towers} · kadırga ${R.galleys}`, `Town levels ${R.towns} · harbours ${R.harbors} · forts ${R.forts} · workshops ${R.shops} · watchtowers ${R.towers} · galleys ${R.galleys}`)}${G.tradeGold ? ' · ' + L(`ticaretten ${fmtGold(G.tradeGold)}💰`, `${fmtGold(G.tradeGold)}💰 from trade`) : ''}</p>`;
+  }
   html += `<div class="ovgrid">
     <div class="ck-card"><small class="eyebrow">${L('Veliaht', 'Heir')}</small>${heir ? personLine(heir, p) : `<p class="bad small"><b>${L('Varisin yok! Ölürsen hanedan sona erer.', 'You have no heir! If you die, your dynasty ends.')}</b></p>`}
       <p class="small muted">${L('Veraset', 'Succession')}: ${law().veraset === 'esit' ? L('Eşit (en büyük çocuk)', 'Equal (eldest child)') : L('Erkek öncelikli', 'Male preference')}</p></div>
     <div class="ck-card"><small class="eyebrow">${L('Savaşlar', 'Wars')}</small>${wars.length ? wars.map(o => `<p class="rel-line">${flagHtml(o, 14)} <b>${esc(o.name)}</b>${(() => { const w = G.wars.find(w => [w.a, w.b].includes(r.id) && [w.a, w.b].includes(o.id)); return w ? ` <small class="muted">· ${L('aldığın', 'taken')} ${w.taken[r.id] || 0} / ${L('kaybettiğin', 'lost')} ${w.taken[o.id] || 0}</small>` : ''; })()}</p>`).join('') : `<p class="small muted">${L('Barış içindesin.', 'You are at peace.')}</p>`}
-      <small class="eyebrow">${L('Müttefikler', 'Allies')}</small>${allies.length ? allies.map(o => `<p class="rel-line">${flagHtml(o, 14)} ${esc(o.name)}</p>`).join('') : `<p class="small muted">${L('Savunma paktın yok.', 'No defensive pacts.')}</p>`}</div></div>`;
+      <small class="eyebrow">${L('Müttefikler', 'Allies')}</small>${allies.length ? allies.map(o => `<p class="rel-line">${flagHtml(o, 14)} ${esc(o.name)}</p>`).join('') : `<p class="small muted">${L('İttifakın yok.', 'No alliances.')}</p>`}</div></div>`;
   html += `<h3>${L('Kraliyet arazisi', 'Royal demesne')} <small class="muted">(${demesne.length}/${demesneLimit(p)})</small></h3>
-    <div class="holdgrid">${demesne.map(s => `<button class="hcard" data-goto="${s.id}"><b>${s.kind === 'sehir' ? '🏙️' : '🏰'} ${esc(s.name)}${s.capital ? ' ★' : ''}</b><small>${settIncome(s, p) >= 0 ? '+' : ''}${settIncome(s, p)}💰 · ${L('huzursuzluk', 'unrest')} <span class="${unrestCls(s.unrest || 0)}">%${Math.round(s.unrest || 0)}</span>${s.q ? ' · 🏗️' : ''}${s.siege ? ' · 🔥' : ''}</small></button>`).join('')}</div>
-    ${demesne.length > demesneLimit(p) ? `<p class="small bad">${L('Arazi sınırını aşıyorsun: fazla toprakları vasallarına bağışla, yoksa yönetim zorlaşır.', 'You exceed your demesne limit: grant extra holdings to vassals.')}</p>` : ''}`;
+    <div class="holdgrid">${demesne.map(s => `<button class="hcard" data-goto="${s.id}"><b>${s.kind === 'sehir' ? '🏙️' : '🏰'} ${esc(s.name)}${s.capital ? ' ★' : ''}</b><small>${s.kind === 'sehir' ? L('Şehir', 'City') : L('Kale', 'Castle')}</small></button>`).join('')}</div>
+    ${demesne.length > demesneLimit(p) ? `<p class="small mid">${L('Arazi sınırını aşıyorsun: fazla toprakları vasallarına bağışla (kişi kartından "Toprak bağışla").', 'You exceed your demesne limit: grant extra holdings to vassals ("Grant land" on their card).')}</p>` : ''}`;
   if (G.loan) html += `<p class="small">🏦 ${L('Borç', 'Loan')}: ${G.loan.amt}💰 · ${Math.max(0, G.loan.due - monthIndex())} ${L('ay kaldı', 'months left')}</p>`;
   return html;
+}
+function realmMarket(p) {
+  const s = seatOf(p);
+  return marketHtml(s, p);
 }
 function realmCouncil(p) {
   return `<p class="small muted">${L('Meclis üyeleri krallığını senin adına yönetir. Her üye ayda 3💰 maaş alır; ilgili yeteneği ne kadar yüksekse etkisi o kadar büyüktür.', 'Your councillors govern in your name. Each draws 3💰 a month; the higher their key skill, the greater the effect.')}</p>
@@ -190,10 +153,10 @@ function realmLaws(p) {
   const lw = law(), lc = cooldown('law');
   const op = v => (v > 0 ? `<span class="good">${L('vasallar', 'vassals')} +${v}</span>` : v < 0 ? `<span class="bad">${L('vasallar', 'vassals')} ${v}</span>` : `<span class="muted">±0</span>`);
   return `${lc ? `<p class="small mid">⏳ ${L(`Yasalar ${lc} ay sonra yeniden değiştirilebilir.`, `Laws can be changed again in ${lc} months.`)}</p>` : ''}
-    ${lawCard(L('Krallık vergisi', 'Crown authority: taxes'), L('Vasallarından alınan vergi. Hazineyi doldurur ama sadakati aşındırır.', 'Taxes levied on your vassals. Fills the treasury but wears down their loyalty.'), 'vergi',
-      [[0, L('Hafif', 'Light'), op(LAW_TAX_OP[0])], [1, L('Normal', 'Normal'), op(LAW_TAX_OP[1])], [2, L('Yüksek', 'High'), op(LAW_TAX_OP[2])], [3, L('Ezici', 'Crushing'), op(LAW_TAX_OP[3])]], lw.vergi)}
-    ${lawCard(L('Asker yükümlülüğü', 'Levy obligation'), L('Vasalların göndereceği asker. Ordu kapasiteni ve seferberliği belirler.', 'How many men your vassals must send. Sets your army size and the strength of a call to arms.'), 'yukumluluk',
-      [[0, L('Düşük', 'Low'), op(LAW_LEVY_OP[0])], [1, L('Normal', 'Normal'), op(LAW_LEVY_OP[1])], [2, L('Ağır', 'Heavy'), op(LAW_LEVY_OP[2])]], lw.yukumluluk)}
+    ${lawCard(L('Krallık vergisi', 'Crown authority: taxes'), L('Altın gelirini belirler. Hazineyi doldurur ama vasalların sadakatini aşındırır.', 'Sets your gold income. Fills the treasury but wears down your vassals\' loyalty.'), 'vergi',
+      [[0, L('Hafif', 'Light'), '×0.8 · ' + op(LAW_TAX_OP[0])], [1, L('Normal', 'Normal'), '×1 · ' + op(LAW_TAX_OP[1])], [2, L('Yüksek', 'High'), '×1.2 · ' + op(LAW_TAX_OP[2])], [3, L('Ezici', 'Crushing'), '×1.35 · ' + op(LAW_TAX_OP[3])]], lw.vergi)}
+    ${lawCard(L('Asker yükümlülüğü', 'Levy obligation'), L('Vasalların göndereceği asker: asker sınırını belirler.', 'How many men your vassals must send: sets your troop cap.'), 'yukumluluk',
+      [[0, L('Düşük', 'Low'), '×0.85 · ' + op(LAW_LEVY_OP[0])], [1, L('Normal', 'Normal'), '×1 · ' + op(LAW_LEVY_OP[1])], [2, L('Ağır', 'Heavy'), '×1.2 · ' + op(LAW_LEVY_OP[2])]], lw.yukumluluk)}
     ${lawCard(L('Veraset', 'Succession'), L('Tacı kimin devralacağı. Değiştirmek 100 şana mal olur.', 'Who inherits the crown. Changing it costs 100 prestige.'), 'veraset',
       [['erkek', L('Erkek öncelikli', 'Male preference'), ''], ['esit', L('Eşit', 'Equal'), L('en büyük çocuk', 'eldest child')]], lw.veraset)}`;
 }
@@ -208,25 +171,26 @@ function realmDecisions(p) {
   return `<p class="small muted">${L('Kararlar krallığın kaderini belirleyen büyük adımlardır. Bazılarının bekleme süresi vardır.', 'Decisions are great steps that shape your realm. Some have a cooldown.')}</p><div class="decgrid">${decisionCards(p)}</div>`;
 }
 function realmDiplomacy(p, r) {
-  const list = realms().filter(o => o !== r).sort((a, b) => (atWarRealms(r, b) - atWarRealms(r, a)) || (allied(r, b) - allied(r, a)) || realmSettlements(b).length - realmSettlements(a).length);
-  return `<p class="small muted">${L('🕊️ Elçi: 20💰 ve 1⚡, hükümdarın sana bakışı +12. Konuşarak pakt, barış ve evlilik ittifakı kurabilirsin.', '🕊️ Envoy: 20💰 and 1⚡, ruler opinion +12. Talk to arrange pacts, peace and marriages.')}</p>
+  const sz = o => { const n = natOfRealm(o); return n ? NR[n.i].tiles : 0; };
+  const list = realms().filter(o => o !== r && natOfRealm(o)).sort((a, b) => (atWarRealms(r, b) - atWarRealms(r, a)) || (allied(r, b) - allied(r, a)) || sz(b) - sz(a));
+  return `<p class="small muted">${L('🕊️ Elçi: 20💰 ve 1⚡, hükümdarın sana bakışı +12. İttifak ve barış için haritada o krallığın toprağına da dokunabilirsin.', '🕊️ Envoy: 20💰 and 1⚡, ruler opinion +12. You can also tap a realm\'s land on the map for alliances and peace.')}</p>
   ${list.map(o => {
     const k = ch(o.holder);
     if (!k) return '';
     const war = atWarRealms(r, o), pact = allied(r, o);
     const st = war ? `<span class="tag enemy">⚔️ ${L('Savaş', 'War')}</span>` : pact ? `<span class="tag friend">🤝 ${L('Pakt', 'Pact')}</span>` : '';
     return `<div class="dipl2 ${war ? 'war' : pact ? 'ally' : ''}">${flagHtml(o, 26)}<button class="dp-pt" data-open="${k.id}">${avatar(k, 38)}</button>
-      <span class="dn"><b>${esc(o.name)}</b><small>${esc(nm(k))} · ${realmSettlements(o).length} ${L('yer', 'holdings')} · ${L('güç', 'power')} ~${Math.round(charPower(k))}</small><span class="tags">${st}</span></span>${opBadge(opinion(k, p))}
+      <span class="dn"><b>${esc(o.name)}</b><small>${esc(nm(k))} · ${(landShare(natOfRealm(o).i) * 100).toFixed(1)}% · ⚔ ${fmtCount(natOfRealm(o).troops)}</small><span class="tags">${st}</span></span>${opBadge(opinion(k, p))}
       <span class="ab"><button data-envoy="${o.id}" title="${L('Elçi gönder', 'Send envoy')}" ${p.gold < 20 || G.ap < 1 ? 'disabled' : ''}>🕊️</button><button data-dtalk="${k.id}" title="${L('Konuş', 'Talk')}" ${G.ap < 1 ? 'disabled' : ''}>💬</button>${war ? `<button data-act="baris" data-t="${k.id}" title="${L('Barış teklif et', 'Offer peace')}" ${G.ap < 1 ? 'disabled' : ''}>🏳️</button>` : `<button class="danger" data-act="savas" data-t="${k.id}" title="${L('Savaş ilan et', 'Declare war')}" ${G.ap < 1 ? 'disabled' : ''}>⚔️</button>`}</span></div>`;
   }).join('')}`;
 }
 function realmVassals(p) {
   const vas = vassalsOf(p).sort((a, b) => opinion(a, p) - opinion(b, p));
-  if (!vas.length) return `<p class="muted">${L('Vasalın yok. Topraklarını saraylılarına bağışlayarak vasal edinebilirsin (haritada kendi iline dokun).', 'You have no vassals. Grant holdings to courtiers to gain vassals (tap one of your provinces on the map).')}</p>`;
+  if (!vas.length) return `<p class="muted">${L('Vasalın yok. Fethettiğin yerleşimleri saraylılarına bağışlayarak vasal edinirsin (kişi kartında "Toprak bağışla").', 'You have no vassals. Grant conquered holdings to courtiers to gain vassals ("Grant land" on their card).')}</p>`;
   return `<p class="small muted">${L('En hoşnutsuzdan en sadığa sıralı. Hırslı ya da kibirli ve sana kızgın vasallar isyan edebilir.', 'Sorted from least to most loyal. Ambitious or arrogant vassals who resent you may revolt.')}</p>
   ${vas.map(v => {
     const risk = (has(v, 'hirsli') || has(v, 'kibirli')) && opinion(v, p) < -30;
-    return `<div class="dipl2 ${risk ? 'war' : ''}"><button class="dp-pt" data-open="${v.id}">${avatar(v, 40)}</button><span class="dn"><b>${esc(nm(v))}</b><small>${settlementsOf(v).map(s => `<a data-goto="${s.id}">${esc(s.name)}</a>`).join(', ')} · ${L('güç', 'power')} ~${Math.round(charPower(v))}${v.sup ? ' · 👑?' : ''}</small>${risk ? `<span class="tags"><span class="tag enemy">⚠ ${L('isyan riski', 'revolt risk')}</span></span>` : ''}</span>${opBadge(opinion(v, p))}
+    return `<div class="dipl2 ${risk ? 'war' : ''}"><button class="dp-pt" data-open="${v.id}">${avatar(v, 40)}</button><span class="dn"><b>${esc(nm(v))}</b><small>${settlementsOf(v).map(s => `<a data-goto="${s.id}">${esc(s.name)}</a>`).join(', ')} · ${settlementsOf(v).length} ${L('yer', 'holdings')}${v.sup ? ' · 👑?' : ''}</small>${risk ? `<span class="tags"><span class="tag enemy">⚠ ${L('isyan riski', 'revolt risk')}</span></span>` : ''}</span>${opBadge(opinion(v, p))}
       <span class="ab"><button data-reward="${v.id}" ${p.gold < 30 ? 'disabled' : ''} title="${L('Ödüllendir (30💰)', 'Reward (30💰)')}">🎁</button><button data-dtalk="${v.id}" title="${L('Konuş', 'Talk')}" ${G.ap < 1 ? 'disabled' : ''}>💬</button></span></div>`;
   }).join('')}`;
 }
@@ -250,25 +214,11 @@ function runDecision(id, confirmed) {
   saveGame();
   closeDrawer();
   if (msg) resultModal(msg); else if (UI.modal === 'realm') renderRealm();
-  G.terrDirty = true;
   updateHUD();
 }
 function bindRealmUI(root) {
   const p = P();
-  root.querySelectorAll('[data-hold]').forEach(b => b.onclick = e => { e.stopPropagation(); UI.hold = b.dataset.hold; openDrawer('hold'); });
-  root.querySelectorAll('[data-tax]').forEach(b => b.onclick = () => { const s = G.titles[UI.hold]; if (s && s.holder === p.id) { s.tax = +b.dataset.tax; saveGame(); refreshPanels(); } });
-  root.querySelectorAll('[data-build]').forEach(b => b.onclick = () => {
-    const s = G.titles[UI.hold], k = b.dataset.build;
-    if (!s || s.holder !== p.id || canBuild(s, k)) return;
-    const c = buildCost(s, k);
-    if (p.gold < c) return toast(L(`${c} altın gerekli`, `Requires ${c} gold`));
-    startBuild(s, k, p);
-    log(L(`🏗️ ${s.name}: ${BUILDINGS[k].ad(s)} inşaatı başladı (${c}💰).`, `🏗️ ${s.name}: construction of ${BUILDINGS[k].ad(s)} began (${c}💰).`), 'player');
-    toast(L(`🏗️ Ustalar işe koyuldu: ${BUILDINGS[k].ad(s)}`, `🏗️ The masons are at work: ${BUILDINGS[k].ad(s)}`));
-    saveGame(); refreshPanels();
-  });
-  root.querySelectorAll('[data-speed]').forEach(b => b.onclick = () => { const s = G.titles[b.dataset.speed]; const c = speedCost(s); if (!s.q || p.gold < c) return; p.gold -= c; finishBuild(s); saveGame(); refreshPanels(); });
-  root.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { const s = G.titles[UI.sett], k = b.dataset.buy, pr = itemPrice(s, k); if (p.gold < pr) return; p.gold -= pr; addItem(p, k); toast(L(`${ITEMS[k].ad} satın aldın.`, `You bought ${ITEMS[k].ad}.`)); saveGame(); refreshPanels(); });
+  root.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { const s = seatOf(p), k = b.dataset.buy, pr = itemPrice(s, k); if (p.gold < pr) return; p.gold -= pr; addItem(p, k); toast(L(`${ITEMS[k].ad} satın aldın.`, `You bought ${ITEMS[k].ad}.`)); saveGame(); refreshPanels(); });
   root.querySelectorAll('[data-seat]').forEach(b => b.onclick = () => { closeDrawer(); openCouncilPicker(b.dataset.seat); });
   root.querySelectorAll('[data-dtalk]').forEach(b => b.onclick = () => { closeDrawer(); closeModal(); openDialogue(+b.dataset.dtalk); });
   root.querySelectorAll('[data-law]').forEach(b => b.onclick = () => {
@@ -284,4 +234,13 @@ function bindRealmUI(root) {
   root.querySelectorAll('[data-dec]').forEach(b => b.onclick = () => runDecision(b.dataset.dec));
   root.querySelectorAll('[data-envoy]').forEach(b => b.onclick = () => { sendEnvoy(G.titles[b.dataset.envoy]); saveGame(); refreshPanels(); });
   root.querySelectorAll('[data-reward]').forEach(b => b.onclick = () => { const v = ch(+b.dataset.reward); if (!v || p.gold < 30) return; p.gold -= 30; v.gold += 30; addOp(v, p, 15); remember(v, p, 'hediye', 6); toast(L(`${nm(v)} ödülünü minnetle kabul etti. (+15)`, `${nm(v)} gratefully accepted your reward. (+15)`)); saveGame(); refreshPanels(); });
+}
+
+function sendEnvoy(o) {
+  const p = P(), k = o && ch(o.holder);
+  if (!k || p.gold < 20 || G.ap < 1) return;
+  p.gold -= 20; G.ap -= 1;
+  const g = 12 + Math.floor((stat(p, 'dip') + councilBonus('sansolye')) / 3);
+  addOp(k, p, g); remember(k, p, 'hediye', 4);
+  toast(L(`🕊️ Elçin ${o.name} sarayında ağırlandı. (+${g})`, `🕊️ Your envoy was received at the court of the ${o.name}. (+${g})`));
 }

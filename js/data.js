@@ -58,8 +58,6 @@ const TRAITS = biEach({
   yarali: { ad: BL('Yaralı', 'Scarred'), st: { sav: -1, cek: -1 }, d: BL('Bedeninde derin yara izleri taşıyor.', 'Bears deep scars.') },
   akrabakatili: { ad: BL('Akraba Katili', 'Kinslayer'), st: {}, d: BL('Kendi kanını döktüğü herkesçe bilinir. Herkes ondan iğrenir.', 'Known to have spilled their own blood. Everyone despises them.') },
   dindar: { ad: BL('Dindar', 'Pious'), st: { dip: 1 }, d: BL('Tanrı korkusu taşır.', 'God-fearing.') },
-  akrabacocugu: { ad: BL('Soy zayıflığı', 'Inbred'), st: { dip: -2, ent: -2, yon: -2, sav: -1, cek: -2 }, d: BL('Yakın akraba bir anne-babadan doğdu; bedeni ve zihni zayıf.', 'Born of closely related parents; frail in body and mind.') },
-  frengi: { ad: BL('Frengi', 'The Great Pox'), st: { cek: -2, sav: -1 }, d: BL('Utanç verici bir hastalık. Sağlığı kemirir, sevgililere ve eşe bulaşır. Şifahane iyileştirebilir.', 'A shameful disease. It gnaws at health and spreads to lovers and spouse. A hospital can cure it.') },
 });
 const PERSONALITY = Object.keys(TRAITS).filter(k => TRAITS[k].kisilik);
 const PHYSICAL = Object.keys(TRAITS).filter(k => TRAITS[k].fiziksel);
@@ -75,7 +73,6 @@ const SECRETS = biEach({
   eskiya: { ad: BL('Eşkıyalık', 'Banditry'), shame: 20, suc: true, d: (a) => L(`${a} geceleri yol kesip yolcuları soyuyor.`, `${a} robs travellers on the roads at night.`) },
   komplo: { ad: BL('Taht komplosu', 'Plot for the throne'), shame: 30, suc: true, d: (a, t) => L(`${a}, ${t} adlı hükümdarı tahttan indirmek için gizlice destekçi topluyor.`, `${a} is secretly gathering supporters to depose ${t}.`) },
   iftira: { ad: BL('İftira', 'Slander'), shame: 10, suc: false, d: (a, t) => L(`${a}, ${t} hakkında yalan yaydı.`, `${a} spread lies about ${t}.`) },
-  ensest: { ad: BL('Yasak akraba ilişkisi', 'Incestuous affair'), shame: 35, suc: false, d: (a, t) => L(`${a} ile ${t}, yakın akraba olmalarına rağmen gizlice birlikte.`, `${a} and ${t} are secretly lovers despite being close kin.`) },
 });
 
 /* ---------- Kültürler ---------- */

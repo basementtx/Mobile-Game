@@ -4,6 +4,38 @@
    piç çocuklar, evlilik ayarlama; saray halkı ve meslekler
    ========================================================= */
 
+/* ---------- Yetişkinlik, sevgililer ve gebelik (basit) ---------- */
+const isGrown = c => !!c && c.age >= 18;
+/* Gönül ilişkileri karşı cinsten yetişkinler arasındadır */
+const attracted = (a, b) => !!a && !!b && a.female !== b.female;
+function conceive(mother, father) {
+  if (mother.preg) return;
+  mother.preg = { f: father.id, due: monthIndex() + 9, told: false };
+}
+function pregTick() {
+  const p = P();
+  for (const m of living()) {
+    if (!m.preg) continue;
+    const f = ch(m.preg.f);
+    if (!m.female || m.age > 50) { delete m.preg; continue; }
+    const left = m.preg.due - monthIndex();
+    if (!m.preg.told && left <= 7) {
+      m.preg.told = true;
+      if (m.id === p.id || m.preg.f === p.id || m.spouseId === p.id) {
+        const secret = m.preg.f === p.id && m.spouseId && m.spouseId !== p.id;
+        log(m.id === p.id ? L(`👶 Hamilesin! Babası ${nm(f)}.`, `👶 You are with child! The father is ${nm(f)}.`)
+          : L(`👶 ${nm(m)} hamile.${secret ? ' Çocuğun babası sensin — ama kocası bunu bilmiyor.' : ''}`, `👶 ${nm(m)} is with child.${secret ? ' You are the father — but her husband does not know.' : ''}`), 'good');
+      }
+    }
+    if (left <= 0) {
+      delete m.preg;
+      if (chance(0.04)) { if (relevant(m)) log(L(`😢 ${nm(m)} bebeğini düşürdü.`, `😢 ${nm(m)} lost the child.`), 'bad'); continue; }
+      if (f) birth(m, f);
+      if (chance(0.03)) die(m, L('Doğumda öldü', 'Died in childbirth'));
+    }
+  }
+}
+
 /* ---------- Meslekler (topraksız saray halkı ve sokaklar) ---------- */
 const JOBS = biEach({
   hizmetci: { ad: BL('Hizmetkâr', 'Servant'), i: '🧺' },
@@ -103,15 +135,11 @@ function tabAile(p) {
   const lovers = p.lovers.map(ch).filter(Boolean);
   html += `<h3>🌹 ${L('Sevgililer', 'Lovers')}</h3>${lovers.length ? lovers.map(l => {
     const n = kidsOf(p).filter(k => k.motherId === l.id || k.fatherId === l.id || k.realFatherId === l.id).length;
-    return `<div class="dipl2"><button class="dp-pt" data-open="${l.id}">${avatar(l, 38)}</button><span class="dn"><b>${esc(nm(l))}</b><small>${esc(titleOf(l))} · ${l.age}${n ? ' · ' + L(`${n} çocuğunuz var`, `${n} child${n > 1 ? 'ren' : ''} together`) : ''}${l.spouseId ? ' · ' + L('evli', 'married') : ''}</small></span>${opBadge(opinion(l, p))}
-      <span class="ab"><button data-night="${l.id}" title="${L('Mahrem gece', 'Intimate night')}" ${bedReq(p, l) ? 'disabled' : ''}>🌙</button></span></div>`;
+    return `<div class="dipl2"><button class="dp-pt" data-open="${l.id}">${avatar(l, 38)}</button><span class="dn"><b>${esc(nm(l))}</b><small>${esc(titleOf(l))} · ${l.age}${n ? ' · ' + L(`${n} çocuğunuz var`, `${n} child${n > 1 ? 'ren' : ''} together`) : ''}${l.spouseId ? ' · ' + L('evli', 'married') : ''}</small></span>${opBadge(opinion(l, p))}</div>`;
   }).join('') : `<p class="small muted">${L('Sevgilin yok.', 'You have no lovers.')}</p>`}`;
-  if (sp && isGrown(sp)) html += `<button class="wide" data-night="${sp.id}" ${bedReq(p, sp) ? 'disabled' : ''}>🌙 ${L(`${esc(sp.name)} ile bir gece geçir (çocuk sahibi olmayı dene)`, `Spend a night with ${esc(sp.name)} (try for a child)`)}</button>`;
-  html += intimacyCard(p);
   return html;
 }
 function bindFamily(root) {
-  root.querySelectorAll('[data-night]').forEach(b => b.onclick = () => { closeDrawer(); openIntimacy(+b.dataset.night); if (NIGHT) { NIGHT.child = 'iste'; renderIntimacy(); } });
   root.querySelectorAll('[data-match]').forEach(b => b.onclick = () => openMatchPicker(+b.dataset.match));
 }
 

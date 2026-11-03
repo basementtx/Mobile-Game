@@ -316,7 +316,7 @@ function endDialogue() {
 }
 
 /* ---------- Konular ---------- */
-function canFlirt(p, t) { return isGrown(p) && isGrown(t) && !t.prisonerOf && !p.prisonerOf && p.spouseId !== t.id; }
+function canFlirt(p, t) { return isGrown(p) && isGrown(t) && !closeKin(p, t) && !t.prisonerOf && !p.prisonerOf && p.spouseId !== t.id; }
 function rootOptions(p, t) {
   const o = [];
   const u = DLG.used;
@@ -367,7 +367,7 @@ function smallTalk(p, t, k) {
   if (k === 'hava') {
     meSay(L('Bu yıl hasat nasıl? Yağmurlar yetti mi?', 'How is the harvest this year? Did the rains come?'));
     const s = settlementsOf(t)[0];
-    npcSay(s ? (s.prosperity > 1.05 ? L(`Ambarlar dolu, ${s.name} halkı mutlu. Tanrı'ya şükür.`, `The granaries are full and ${s.name} is content, thank God.`) : s.unrest > 40 ? L(`${s.name} köylüleri homurdanıyor. Hasat kıt, sabır daha da kıt.`, `The peasants of ${s.name} grumble. The harvest is thin, their patience thinner.`) : L('İdare eder. Ne bolluk ne kıtlık.', 'It will do. Neither plenty nor famine.'))
+    npcSay(s ? (chance(0.45) ? L(`Ambarlar dolu, ${s.name} halkı mutlu. Tanrı'ya şükür.`, `The granaries are full and ${s.name} is content, thank God.`) : enemiesOf(realmOf(t)).length ? L(`${s.name} köylüleri homurdanıyor. Hasat kıt, sabır daha da kıt.`, `The peasants of ${s.name} grumble. The harvest is thin, their patience thinner.`) : L('İdare eder. Ne bolluk ne kıtlık.', 'It will do. Neither plenty nor famine.'))
       : pickLine([T2('Yağmur dinmek bilmiyor; çizmelerim hiç kurumuyor.', 'The rain never stops; my boots are never dry.'), T2('Bu sıcakta at bile terliyor, {a}.', 'In this heat even the horses sweat, {a}.')], v));
   } else if (k === 'aile') {
     meSay(L('Ailen nasıl? Herkes iyi mi?', 'How is your family? Is everyone well?'));
@@ -385,7 +385,7 @@ function smallTalk(p, t, k) {
   } else if (k === 'toprak') {
     meSay(L('Toprakların nasıl? İşler yolunda mı?', 'How fare your lands? All well?'));
     const s = settlementsOf(t)[0];
-    npcSay(s.q ? L(`${s.name}'da ${BUILDINGS[s.q.k].ad(s)} yaptırıyorum. Taşçılar paramı yiyor ama değecek.`, `I am building ${BUILDINGS[s.q.k].ad(s)} at ${s.name}. The masons eat my gold, but it will be worth it.`) : s.unrest > 50 ? L('Halk huzursuz. Vergileri hafifletmem lazım ama hazine boş.', 'The people are restless. I should ease the taxes, but the treasury is empty.') : L(`${s.name} gelişiyor. Pazar her hafta biraz daha kalabalık.`, `${s.name} prospers. The market grows busier each week.`));
+    npcSay(enemiesOf(realmOf(t)).length ? L(`Sınırlar alevler içinde; ${s.name} surlarını onartıyorum. Taşçılar paramı yiyor ama değecek.`, `The borders are aflame; I am mending the walls of ${s.name}. The masons eat my gold, but it will be worth it.`) : chance(0.3) ? L('Halk huzursuz. Vergileri hafifletmem lazım ama hazine boş.', 'The people are restless. I should ease the taxes, but the treasury is empty.') : L(`${s.name} gelişiyor. Pazar her hafta biraz daha kalabalık.`, `${s.name} prospers. The market grows busier each week.`));
   } else if (k === 'savas') {
     meSay(L('Savaş nasıl gidiyor sence?', 'How do you think the war goes?'));
     const foe = pick(enemiesOf(realmOf(t)));
@@ -835,8 +835,7 @@ function flirtOptions(p, t) {
   if (!t.lovers.includes(p.id)) o.push({ i: '💌', l: L('Gözlerine bakıp iltifat et', 'Hold their gaze and flatter'), h: `%${flirtChance(p, t)}`, dis: DLG.used.flirt ? L('Denedin', 'Tried') : null, f: () => dStep(1, () => flirt(p, t)) });
   const ready = t.lovers.includes(p.id) || DLG.used.flirtOk;
   if (!t.lovers.includes(p.id)) o.push({ i: '🌹', l: L('Gizli bir buluşma teklif et', 'Propose a secret tryst'), h: `%${seduceChance(p, t) + (DLG.used.flirtOk ? 15 : 0)}`, dis: !ready ? L('Önce flört etmelisin', 'Flirt first') : DLG.used.tryst ? L('Denedin', 'Tried') : null, f: () => dStep(1, () => tryst(p, t)) });
-  { const br = bedReq(p, t), noTime = L('Bu ay vaktin kalmadı', 'No time left this month');
-    o.push({ i: '🌙', l: L('Odana davet et (mahrem gece)', 'Invite them to your chambers'), h: `%${bedChance(p, t)} · 1⚡`, dis: br || null, f: () => { const id = t.id; endDialogue(); openIntimacy(id); } }); }
+  if (t.lovers.includes(p.id)) o.push({ i: '🌹', l: L('Birlikte gece geçir', 'Spend the night together'), f: () => dStep(1, () => { meSay(L('Bu gece seninle kalmak istiyorum.', 'I want to stay with you tonight.')); npcSay(L('Kapımı kilitlemeyeceğim...', 'I shall leave my door unlocked...')); addOp(t, p, 8); stress(p, -10); DLG.used.night = 1; if (t.spouseId) addRumor(p, t, ch(t.spouseId), 'flort', 0.05); }), dis: DLG.used.night ? L('Bu gece yeterdi', 'Enough for tonight') : null });
   if (isAdult(p) && !p.spouseId && !t.spouseId && !closeKin(p, t)) o.push({ i: '💍', l: L('Evlenme teklif et', 'Propose marriage'), h: `%${marryChance(p, t)}`, dis: DLG.used.marry ? L('Teklif ettin', 'Proposed') : null, f: () => dStep(1, () => propose(p, t)) });
   return o;
 }
@@ -930,8 +929,8 @@ function askJoin(p, t) {
     const old = ch(t.lordId); if (old) addOp(old, p, -8);
     t.lordId = p.id;
     npcSay(L('Kılıcım artık senin hizmetinde.', 'My sword is yours to command.'));
-    const pt = playerParty();
-    if (pt && t.rank === 2) { const add = troopMix(t.cul, rnd(6, 12)); for (const k in add) pt.troops[k] = (pt.troops[k] || 0) + add[k]; sysSay(L(`🛡️ ${esc(t.name)} adamlarıyla katıldı: ${lossText(add)}`, `🛡️ ${esc(t.name)} joined with their men: ${lossText(add)}`), 'good'); }
+    const nn = natOfRealm(ownRealm(p));
+    if (nn && t.rank === 2) { const add = rnd(300, 700); nn.troops += add; sysSay(L(`🛡️ ${esc(t.name)} adamlarıyla katıldı: +${add} asker`, `🛡️ ${esc(t.name)} joined with their men: +${add} troops`), 'good'); }
     else sysSay(L(`🛡️ ${esc(t.name)} artık sarayında.`, `🛡️ ${esc(t.name)} is now at your court.`), 'good');
   } else npcSay(L('Şimdiki efendime sadakat borçluyum.', 'I owe loyalty to my present lord.'));
 }
@@ -1115,7 +1114,7 @@ Object.assign(EVENTS, {
       return [
         { t: L('Ödülü al, teşekkür et (+60💰)', 'Take the reward with thanks (+60💰)'), f: () => { if (l.gold >= 60) { l.gold -= 60; } p.gold += 60; addOp(l, p, 5); return L('Altınları hazinene koydun.', 'You put the gold in your coffers.'); } },
         { t: L(`Kaleyi kendin için talep et (%${askC})`, `Claim the castle for yourself (${askC}%)`), f: () => { if (chance(askC / 100)) { giveTitle(s, p); refreshLieges(); G.terrDirty = true; return L(`Hükümdar biraz düşündükten sonra razı oldu. <b>${s.name}</b> senin!`, `After some thought the ruler agreed. <b>${s.name}</b> is yours!`); } addOp(l, p, -15); return L('Hükümdar yüzünü buruşturdu: "Haddini bil, komutan." (-15 ilişki)', 'The ruler frowned: "Know your place, commander." (-15 opinion)'); } },
-        { t: L('Kaleyi zorla tut ve isyan et!', 'Hold the castle by force and rebel!'), f: () => { giveTitle(s, p); p.office = null; const pt = playerParty(); if (pt) pt.royal = false; const r = rebel(p); G.terrDirty = true; return L(`Sancağını surlara diktin ve tacı tanımadığını ilan ettin! <b>${r ? r.name : ''}</b> kuruldu. Ordun artık senin — ama maaşlarını da sen ödeyeceksin.`, `You planted your banner on the walls and renounced the crown! The <b>${r ? r.name : ''}</b> is founded. The army is yours now — and so are its wages.`); } },
+        { t: L('Kaleyi zorla tut ve isyan et!', 'Hold the castle by force and rebel!'), f: () => { giveTitle(s, p); p.office = null; const r = rebel(p); G.terrDirty = true; return L(`Sancağını surlara diktin ve tacı tanımadığını ilan ettin! <b>${r ? r.name : ''}</b> kuruldu. Ordun artık senin — ama maaşlarını da sen ödeyeceksin.`, `You planted your banner on the walls and renounced the crown! The <b>${r ? r.name : ''}</b> is founded. The army is yours now — and so are its wages.`); } },
       ];
     },
   },
