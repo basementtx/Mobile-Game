@@ -71,6 +71,7 @@ const SECRETS = biEach({
   rusvet: { ad: BL('Rüşvet', 'Bribery'), shame: 10, suc: true, d: (a) => L(`${a} tüccarlardan rüşvet alıyor.`, `${a} takes bribes from merchants.`) },
   pic: { ad: BL('Piç çocuk', 'Bastard child'), shame: 20, suc: false, d: (a, t) => L(`${t} adlı çocuğun annesi ${a}, ama babası annenin kocası değil.`, `${a} is the mother of ${t}, but the father is not her husband.`) },
   eskiya: { ad: BL('Eşkıyalık', 'Banditry'), shame: 20, suc: true, d: (a) => L(`${a} geceleri yol kesip yolcuları soyuyor.`, `${a} robs travellers on the roads at night.`) },
+  komplo: { ad: BL('Taht komplosu', 'Plot for the throne'), shame: 30, suc: true, d: (a, t) => L(`${a}, ${t} adlı hükümdarı tahttan indirmek için gizlice destekçi topluyor.`, `${a} is secretly gathering supporters to depose ${t}.`) },
   iftira: { ad: BL('İftira', 'Slander'), shame: 10, suc: false, d: (a, t) => L(`${a}, ${t} hakkında yalan yaydı.`, `${a} spread lies about ${t}.`) },
 });
 

@@ -66,12 +66,20 @@ function rankNames(c) {
 function rankName(c) {
   if (c.age < 16) return c.female ? L('Kız çocuk', 'Girl') : L('Erkek çocuk', 'Boy');
   if (c.rank === 5) { const r = ownRealm(c); if (r) return rulerTitles(r)[c.female ? 1 : 0]; }
+  if (c.rank >= 2 && isPrince(c)) return isEast(c) ? (c.female ? L('Hanım Sultan', 'Princess') : L('Şehzade', 'Prince')) : (c.female ? L('Prenses', 'Princess') : L('Prens', 'Prince'));
   return rankNames(c)[c.rank];
+}
+/* Hükümdarın meşru çocuğu mu? (Prens/Şehzade) */
+function isPrince(c) {
+  if (!c || c.bastard) return false;
+  for (const id of [c.fatherId, c.motherId]) { const x = ch(id); if (x && x.alive && ownRealm(x)) return true; }
+  return false;
 }
 function nm(c) {
   if (!c) return L('Bilinmeyen biri', 'Someone unknown');
   if (c.age < 16 || c.rank < 2) return `${c.name} ${c.dyn}`;
   const r = rankName(c);
+  if (c.rank < 5 && isPrince(c)) return isEast(c) ? `${c.name} ${r}` : `${r} ${c.name}`;
   if (c.rank === 2 && !isEast(c)) return `${c.female ? 'Dame' : L('Sör', 'Sir')} ${c.name} ${c.dyn}`;
   if (isEast(c) && c.rank >= 2 && c.rank <= 4) return `${c.name} ${r} (${c.dyn})`;
   if (c.rank === 5 && (r === 'Bey' || r === 'Hatun')) return `${c.name} ${r} (${c.dyn})`;
@@ -141,7 +149,9 @@ function makeChar(o = {}) {
     fatherId: o.fatherId ?? null, motherId: o.motherId ?? null, realFatherId: null,
     bastard: false, adopted: false,
     children: [], op: {}, prisonerOf: null, death: null,
+    bonds: {}, mem: [], sup: null,
   };
+  c.pr = o.pr || genPrefs(c);
   G.chars[c.id] = c;
   return c;
 }
@@ -222,7 +232,8 @@ function relName(k) { return { es: L('Eş', 'Spouse'), baba: L('Baba', 'Father')
 function closeKin(a, b) { const r = familyRel(a, b); return r && r !== 'es'; }
 function heirOf(c) {
   const kids = c.children.map(ch).filter(k => k && k.alive && !k.bastard && (k.fatherId === c.id || k.motherId === c.id));
-  kids.sort((a, b) => b.age - a.age);
+  const male = !(c.id === G.playerId && G.law && G.law.veraset === 'esit');
+  kids.sort((a, b) => (male ? (a.female ? 1 : 0) - (b.female ? 1 : 0) : 0) || b.age - a.age);
   return kids[0] || null;
 }
 function marry(a, b) {
@@ -283,6 +294,8 @@ function opinionParts(a, b) {
   if (has(b, 'akrabakatili') && a.id !== b.id) parts.push([L('Akraba katili', 'Kinslayer'), -20]);
   if (has(a, 'paranoyak') && !rel) parts.push([L('Paranoya', 'Paranoia'), -10]);
   if (a.prisonerOf === b.id) parts.push([L('Onu zindanda tutuyor', 'Keeps them imprisoned'), -30]);
+  if (typeof prefOpinionParts === 'function') for (const x of prefOpinionParts(a, b)) parts.push(x);
+  if (typeof vassalLawParts === 'function') for (const x of vassalLawParts(a, b)) parts.push(x);
   return parts;
 }
 function opinion(a, b) { return clamp(opinionParts(a, b).reduce((s, p) => s + p[1], 0), -100, 100); }
@@ -413,9 +426,11 @@ function income(c) {
   if (c.age < 16 || c.prisonerOf) return 0;
   const y = stat(c, 'yon');
   let g = [1, 2, 4, 0, 0, 0][Math.min(c.rank, 5)];
-  for (const t of settlementsOf(c)) g += (t.kind === 'sehir' ? 14 : 8) * (t.prosperity || 1) + Math.floor(y / 3);
+  for (const t of settlementsOf(c)) g += settIncome(t, c);
   const r = ownRealm(c);
-  if (r) g += 3 * Object.values(G.titles).filter(t => isSettlement(t) && t.liege === r.id && t.holder !== c.id).length;
+  const vt = c.id === G.playerId ? [1.5, 3, 4.5, 6][law().vergi] : 3;
+  if (r) g += vt * Object.values(G.titles).filter(t => isSettlement(t) && t.liege === r.id && t.holder !== c.id).length;
+  if (c.id === G.playerId) g *= 1 + councilBonus('hazinedar') * 0.015;
   return Math.round(g);
 }
 /* ---------- Savaş ---------- */
@@ -434,7 +449,7 @@ function murderChance(a, b) {
 function slanderChance(a, b) {
   return clamp(Math.round(35 + (stat(a, 'ent') - stat(b, 'ent')) * 6 + (stat(a, 'dip') - 5) * 2), 5, 90);
 }
-function spyChance(a, b) { return clamp(Math.round(35 + (stat(a, 'ent') - stat(b, 'ent')) * 7), 5, 95); }
+function spyChance(a, b) { return clamp(Math.round(35 + (stat(a, 'ent') - stat(b, 'ent')) * 7 + (a.id === G.playerId ? councilBonus('casus') * 1.5 : 0)), 5, 95); }
 function duelChance(a, b) { return clamp(Math.round(50 + (stat(a, 'sav') - stat(b, 'sav')) * 5), 5, 95); }
 
 /* sonuç: {ok, exposed} */
@@ -560,6 +575,7 @@ function npcAct(c) {
   w('hapis', c.rank >= 3 ? (has(c, 'zalim') || has(c, 'paranoyak') ? 0.6 : 0.2) : 0);
   w('yardim', has(c, 'merhametli') ? 1 : 0);
   w('sovalyelik', c.rank >= 3 ? 0.4 : 0);
+  w('dedikodu', has(c, 'kurnaz') || has(c, 'kibirli') ? 1.6 : 0.7);
   const act = weighted(opts);
   let t;
   switch (act) {
@@ -653,6 +669,7 @@ function npcAct(c) {
       t = choose(near.filter(x => x.gold < 10), x => -x.gold);
       if (t && c.gold >= 10) { c.gold -= 5; t.gold += 5; addOp(t, c, 12); if (t === p) log(L(`🤲 ${nm(c)} sana 5 altın yardım etti.`, `🤲 ${nm(c)} helped you with 5 gold.`), 'good'); }
       break;
+    case 'dedikodu': npcGossip(c, near, p); break;
     case 'sovalyelik': {
       const cands = living().filter(x => x.lordId === c.id && !x.titles.length && x.baseRank === 1 && free(x) && opinion(c, x) > 20);
       if (!cands.length) break;
@@ -876,6 +893,9 @@ function monthTick() {
   fillVacant();
   decayTick();
   populationTick();
+  memTick();
+  bondTick();
+  rumorTick();
   G.ap = AP_MAX;
   G.monthsPlayed++;
   if (!G.over) randomEventTick();
