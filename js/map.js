@@ -193,25 +193,20 @@ function drawMap(time) {
     if (sx < -40 || sx > W + 40 || sy < -40 || sy > H + 40) continue;
     const r = s.liege ? G.titles[s.liege] : null;
     const col = r && !r.dead ? r.color : '#777';
-    const size = clamp(z * 0.22, 4, 9) * (s.kind === 'sehir' ? 1.15 : 1);
-    ctx.fillStyle = '#14100c'; ctx.fillRect(sx - size - 1.5, sy - size - 1.5, size * 2 + 3, size * 2 + 3);
-    ctx.fillStyle = '#f3e7cc'; ctx.fillRect(sx - size, sy - size, size * 2, size * 2);
-    ctx.fillStyle = col;
-    if (s.kind === 'kale') { ctx.fillRect(sx - size * 0.55, sy - size * 0.55, size * 1.1, size * 1.1); }
-    else { ctx.beginPath(); ctx.moveTo(sx, sy - size * 0.7); ctx.lineTo(sx + size * 0.7, sy); ctx.lineTo(sx, sy + size * 0.7); ctx.lineTo(sx - size * 0.7, sy); ctx.closePath(); ctx.fill(); }
-    if (s.capital) drawIcon(ctx, 'crown', sx, sy - size * 1.9, size * 1.7, '#ffd76a', '#1a1208');
-    if (s.siege) drawIcon(ctx, 'fire', sx + size * 1.8, sy - size, size * 1.9, '#ff8a2a', '#1a1208');
-    if (showNames || s.capital) names.push([s, sx, sy + size + 3]);
+    const size = settMarkSize(z, s);
+    drawSettMark(ctx, s, sx, sy, size, col);
+    if (s.siege) drawIcon(ctx, 'fire', sx + size * 1.9, sy - size * 1.2, size * 1.7, '#ff8a2a', '#1a1208');
+    if (showNames || s.capital) names.push([s, sx, sy + size + 2.5]);
   }
   // Ordular: haritada gezinen figür yok; her ilde, o ildeki askerlerin sayısı rozet olarak yazar
   drawArmyBadges(ctx, W, H, z, pp, SETTS);
   // Tur durakları
   if (route) {
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '700 10px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '700 8px system-ui, sans-serif';
     for (const st of route.stops) {
       const [sx, sy] = mapToScreen(st.x, st.y);
-      const s = 8;
-      ctx.fillStyle = st.n === 1 ? '#ffd76a' : '#2a2016'; ctx.strokeStyle = st.n === 1 ? '#1a1208' : '#ffd76a'; ctx.lineWidth = 1.5;
+      const s = 6.5;
+      ctx.fillStyle = st.n === 1 ? '#ffd76a' : '#2a2016'; ctx.strokeStyle = st.n === 1 ? '#1a1208' : '#ffd76a'; ctx.lineWidth = 1.2;
       ctx.beginPath(); ctx.moveTo(sx, sy - s); ctx.lineTo(sx + s, sy); ctx.lineTo(sx, sy + s); ctx.lineTo(sx - s, sy); ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.fillStyle = st.n === 1 ? '#1a1208' : '#ffd76a'; ctx.fillText(String(st.n), sx, sy + 0.5);
     }
@@ -219,10 +214,36 @@ function drawMap(time) {
   // Yerleşim adları en üstte
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   for (const [s, x, y] of names) {
-    ctx.font = `${s.kind === 'sehir' ? 700 : 500} ${clamp(z * 0.42, 10, 15)}px Alegreya, Georgia, serif`;
-    ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(15,10,5,0.9)'; ctx.fillStyle = s.holder === G.playerId ? '#ffd76a' : '#f5ead2';
+    ctx.font = `${s.capital ? 700 : s.kind === 'sehir' ? 600 : 500} ${nameFont(z, s)}px Alegreya, Georgia, serif`;
+    ctx.lineWidth = 2.6; ctx.strokeStyle = 'rgba(15,10,5,0.82)'; ctx.fillStyle = s.holder === G.playerId ? '#ffd76a' : s.capital ? '#fff3d6' : '#efe3c8';
     ctx.strokeText(s.name, x, y); ctx.fillText(s.name, x, y);
   }
+}
+/* ---------- Zarif yerleşim işaretleri ----------
+   Şehir: halkalı yuvarlak · Kale: küçük kare · Başkent: altın halka ve minik taç.
+   Sur seviyesi kadar ince dış halka çizilir. */
+function settMarkSize(z, s) { return clamp(z * 0.12, 2.4, 5.2) * (s.capital ? 1.2 : s.kind === 'sehir' ? 1.05 : 0.95); }
+function nameFont(z, s) { return clamp(z * 0.34, 9, 13) * (s && s.capital ? 1.08 : 1); }
+function drawSettMark(ctx, s, x, y, r, col) {
+  ctx.save();
+  const walls = s.b ? s.b.sur || 0 : 0;
+  ctx.lineWidth = 1;
+  if (s.kind === 'sehir') {
+    if (s.capital) { ctx.beginPath(); ctx.arc(x, y, r + 2.2, 0, 6.2832); ctx.strokeStyle = '#e9c45f'; ctx.lineWidth = 1.3; ctx.stroke(); }
+    else if (walls) { ctx.beginPath(); ctx.arc(x, y, r + 1.9, 0, 6.2832); ctx.strokeStyle = 'rgba(235,225,200,0.55)'; ctx.lineWidth = 0.6 + walls * 0.3; ctx.stroke(); }
+    ctx.beginPath(); ctx.arc(x, y, r + 0.9, 0, 6.2832); ctx.fillStyle = 'rgba(14,10,6,0.9)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fillStyle = col; ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y, r * 0.42, 0, 6.2832); ctx.fillStyle = '#f6ecd4'; ctx.fill();
+  } else {
+    const a = r * 0.9;
+    if (s.capital) { ctx.strokeStyle = '#e9c45f'; ctx.lineWidth = 1.3; ctx.strokeRect(x - a - 2.2, y - a - 2.2, (a + 2.2) * 2, (a + 2.2) * 2); }
+    else if (walls) { ctx.strokeStyle = 'rgba(235,225,200,0.55)'; ctx.lineWidth = 0.6 + walls * 0.3; ctx.strokeRect(x - a - 1.9, y - a - 1.9, (a + 1.9) * 2, (a + 1.9) * 2); }
+    ctx.fillStyle = 'rgba(14,10,6,0.9)'; ctx.fillRect(x - a - 0.9, y - a - 0.9, (a + 0.9) * 2, (a + 0.9) * 2);
+    ctx.fillStyle = col; ctx.fillRect(x - a, y - a, a * 2, a * 2);
+    ctx.fillStyle = '#f6ecd4'; ctx.fillRect(x - a * 0.38, y - a * 0.38, a * 0.76, a * 0.76);
+  }
+  if (s.capital) drawIcon(ctx, 'crown', x, y - r - 5.2, Math.max(6, r * 1.9), '#f3cf6a', 'rgba(26,18,8,0.9)');
+  ctx.restore();
 }
 /* İl -> o ildeki ordular */
 function armiesByProvince() {
@@ -292,7 +313,7 @@ function drawArmyBadges(ctx, W, H, z, pp, SETTS) {
   }
   ctx.restore();
   // 2) Rozetler
-  const fs = clamp(z * 0.4, 9, 12), h = Math.round(fs + 6), sq = h - 4;
+  const fs = clamp(z * 0.3, 7.5, 9.5), h = Math.round(fs + 4), sq = h - 4;
   ctx.font = `700 ${fs}px system-ui, -apple-system, sans-serif`;
   ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
   const order = [...clusters.values()].sort((a, b) => a.list.some(p => p.kind === 'player') - b.list.some(p => p.kind === 'player'));
@@ -305,27 +326,28 @@ function drawArmyBadges(ctx, W, H, z, pp, SETTS) {
     let more = false;
     if (z < 24 && groups.length > 1) { more = true; groups = [groups[0]]; }
     const pv = cl.pv, sett = pv && pv.sett >= 0;
-    const size = clamp(z * 0.22, 4, 9) * 1.15;
+    const st = SETTS[pv ? pv.sett : -1];
+    const size = st ? settMarkSize(z, st) : 3;
     const label = g => fmtCount(g.n) + (more ? '+' : '');
-    const widths = groups.map(g => sq + 6 + ctx.measureText(label(g)).width + 5);
-    const total = widths.reduce((a, b) => a + b, 0) + (groups.length - 1) * 3;
+    const widths = groups.map(g => sq + 4 + ctx.measureText(label(g)).width + 4);
+    const total = widths.reduce((a, b) => a + b, 0) + (groups.length - 1) * 2;
     let x = sx - total / 2;
-    const named = sett && (z >= 16 || (SETTS[pv.sett] && SETTS[pv.sett].capital));
-    const y = sett ? sy + size + 3 + (named ? clamp(z * 0.42, 10, 15) + 4 : 0) : sy - h / 2;
+    const named = sett && (z >= 16 || (st && st.capital));
+    const y = sett ? sy + size + 2.5 + (named ? nameFont(z, st) + 3 : 0) : sy - h / 2;
     groups.forEach((g, i) => {
       const w = widths[i];
-      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x + 1.5, y + 1.5, w, h);
-      ctx.fillStyle = g.isP ? '#2a1d0c' : '#16110c'; ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(x + 1, y + 1, w, h);
+      ctx.fillStyle = g.isP ? 'rgba(42,29,12,0.94)' : 'rgba(20,15,11,0.9)'; ctx.fillRect(x, y, w, h);
       ctx.fillStyle = g.col; ctx.fillRect(x + 2, y + 2, sq, sq);
       if (g.bandit) drawIcon(ctx, 'death-skull', x + 2 + sq / 2, y + 2 + sq / 2, sq * 0.9, '#e8e0d0');
       else if (g.isP) drawIcon(ctx, 'crossed-swords', x + 2 + sq / 2, y + 2 + sq / 2, sq * 0.85, '#1a1208');
       else if (g.siege) drawIcon(ctx, 'fire', x + 2 + sq / 2, y + 2 + sq / 2, sq * 0.85, '#fff2d0');
       ctx.fillStyle = g.isP ? '#ffe08a' : g.hostile ? '#ffb4a8' : '#f2ead8';
-      ctx.fillText(label(g), x + sq + 6, y + h / 2 + 0.5);
-      ctx.lineWidth = g.isP || g.hostile ? 2 : 1;
-      ctx.strokeStyle = g.isP ? '#ffd76a' : g.hostile ? '#e0483a' : 'rgba(0,0,0,0.9)';
+      ctx.fillText(label(g), x + sq + 4, y + h / 2 + 0.5);
+      ctx.lineWidth = g.isP || g.hostile ? 1.3 : 0.8;
+      ctx.strokeStyle = g.isP ? '#ffd76a' : g.hostile ? '#e0483a' : 'rgba(0,0,0,0.85)';
       ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-      x += w + 3;
+      x += w + 2;
     });
   }
 }

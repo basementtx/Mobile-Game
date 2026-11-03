@@ -79,7 +79,7 @@ function nm(c) {
   if (!c) return L('Bilinmeyen biri', 'Someone unknown');
   if (c.age < 16 || c.rank < 2) return `${c.name} ${c.dyn}`;
   const r = rankName(c);
-  if (c.rank < 5 && isPrince(c)) return isEast(c) ? `${c.name} ${r}` : `${r} ${c.name}`;
+  if (c.rank < 5 && isPrince(c)) return isEast(c) && LANG === 'tr' ? `${c.name} ${r}` : `${r} ${c.name}`;
   if (c.rank === 2 && !isEast(c)) return `${c.female ? 'Dame' : L('Sör', 'Sir')} ${c.name} ${c.dyn}`;
   if (isEast(c) && c.rank >= 2 && c.rank <= 4) return `${c.name} ${r} (${c.dyn})`;
   if (c.rank === 5 && (r === 'Bey' || r === 'Hatun')) return `${c.name} ${r} (${c.dyn})`;
@@ -428,7 +428,7 @@ function income(c) {
   let g = [1, 2, 4, 0, 0, 0][Math.min(c.rank, 5)];
   for (const t of settlementsOf(c)) g += settIncome(t, c);
   const r = ownRealm(c);
-  const vt = c.id === G.playerId ? [1.5, 3, 4.5, 6][law().vergi] : 3;
+  const vt = c.id === G.playerId ? [2.5, 4, 6, 8][law().vergi] : 3;
   if (r) g += vt * Object.values(G.titles).filter(t => isSettlement(t) && t.liege === r.id && t.holder !== c.id).length;
   if (c.id === G.playerId) g *= 1 + councilBonus('hazinedar') * 0.015;
   return Math.round(g);

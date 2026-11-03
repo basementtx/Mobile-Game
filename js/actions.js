@@ -25,7 +25,7 @@ const ACTIONS = [
   /* ===================== KİŞİYE YÖNELİK ===================== */
   {
     id: 'sohbet', get ad() { return L('Sohbet et', 'Converse'); }, icon: '💬', ap: 1, tgt: true,
-    show: (p, t) => t.age >= 6,
+    show: () => false, // yerini diyalog sistemi aldı (Konuş)
     req: (p, t) => jailReq(p, t),
     chance: (p, t) => pct(55 + (stat(p, 'dip') - 5) * 5 + opinion(t, p) / 4),
     run(p, t) {

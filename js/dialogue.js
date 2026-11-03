@@ -1024,7 +1024,7 @@ Object.assign(EVENTS, {
   fethinOdulu: {
     baslik: () => L('🏰 Fethin ödülü', '🏰 The spoils of conquest'),
     valid: (p, d) => { const s = G.titles[d.sid], l = ch(d.lid); return s && l && free(l) && s.holder === l.id && p.office === 'komutan'; },
-    metin: (p, d) => { const s = G.titles[d.sid], l = ch(d.lid); return d.grant ? L(`Hükümdarın <b>${nm(l)}</b> elçisini gönderdi: "Majesteleri <b>${s.name}</b> zaferinden çok memnun. Bu kaleyi size tımar olarak bağışlıyor. Artık bir toprak sahibisiniz."`, `Your sovereign <b>${nm(l)}</b> sends an envoy: "His Majesty is delighted by the victory at <b>${s.name}</b>, and grants it to you as your fief. You are now a landholder."`) : L(`Hükümdarın <b>${nm(l)}</b> elçisini gönderdi: "Majesteleri <b>${s.name}</b> zaferinizi kutluyor ve size 60 altın ödül gönderdi. Kale tacın arazisine katıldı."`, `Your sovereign <b>${nm(l)}</b> sends an envoy: "His Majesty congratulates you on taking <b>${s.name}</b>, and sends you 60 gold. The castle joins the royal demesne."`); },
+    metin: (p, d) => { const s = G.titles[d.sid], l = ch(d.lid); return d.grant ? L(`Hükümdarın <b>${nm(l)}</b> elçisini gönderdi: "Hükümdarımız <b>${s.name}</b> zaferinden çok memnun. Bu kaleyi size tımar olarak bağışlıyor. Artık bir toprak sahibisiniz."`, `Your sovereign <b>${nm(l)}</b> sends an envoy: "Our sovereign is delighted by the victory at <b>${s.name}</b>, and grants it to you as your fief. You are now a landholder."`) : L(`Hükümdarın <b>${nm(l)}</b> elçisini gönderdi: "Hükümdarımız <b>${s.name}</b> zaferinizi kutluyor ve size 60 altın ödül gönderdi. Kale tacın arazisine katıldı."`, `Your sovereign <b>${nm(l)}</b> sends an envoy: "Our sovereign congratulates you on taking <b>${s.name}</b>, and sends you 60 gold. The castle joins the royal demesne."`); },
     secenekler: (p, d) => {
       const s = G.titles[d.sid], l = ch(d.lid);
       if (d.grant) return [
@@ -1052,7 +1052,7 @@ function renderDialogue() {
   const o = opinion(t, p), [mood, mcls] = moodText(o);
   const kp = knownPrefs(t);
   const prefChips = kp.length ? kp.map(([cat, k, v]) => `<span class="pchip ${v > 0 ? 'like' : v < 0 ? 'hate' : ''}">${prefIcon(cat, k)} ${esc(prefName(cat, k))}</span>`).join('') : `<span class="muted small">${L('Henüz zevklerini bilmiyorsun.', 'You do not know their tastes yet.')}</span>`;
-  const rel = [relLabel(t, p) || '', tagsFor(p, t)].join('');
+  const rel = tagsFor(p, t);
   const opts = DLG.ended ? [] : viewOptions(p, t);
   const title = { small: L('Hal hatır', 'Small talk'), interests: L('İlgi alanları', 'Interests'), gift: L('Hediye', 'Gift'), invite: L('Etkinlik', 'Activity'), people: L('Kimin hakkında?', 'About whom?'), person: DLG.x ? esc(nm(ch(DLG.x))) : '', compliment: L('İltifat', 'Compliment'), flirt: L('Flört', 'Flirt'), request: L('Rica ve teklifler', 'Requests & proposals'), hostile: L('Sertleş', 'Get tough') }[DLG.view] || L('Ne söyleyeceksin?', 'What will you say?');
   showModal(`<div class="dlg">
